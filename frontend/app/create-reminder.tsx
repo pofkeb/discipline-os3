@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../src/constants/theme';
+import { useSubscription, getLimits } from '../src/contexts/SubscriptionContext';
 import { api } from '../src/services/api';
 import * as Haptics from 'expo-haptics';
 
@@ -16,6 +17,7 @@ const INTERVAL_TYPES = [
 export default function CreateReminderScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { plan } = useSubscription();
   const [title, setTitle] = useState('');
   const [intervalType, setIntervalType] = useState('hours');
   const [intervalValue, setIntervalValue] = useState('1');
@@ -24,6 +26,13 @@ export default function CreateReminderScreen() {
   const handleCreate = async () => {
     if (!title.trim()) {
       Alert.alert('Error', 'Please enter a reminder title');
+      return;
+    }
+    const reminders = await api.getReminders();
+    const limits = getLimits(plan);
+    if (reminders.length >= limits.maxReminders) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      router.push('/paywall');
       return;
     }
     setLoading(true);
@@ -116,6 +125,6 @@ const styles = StyleSheet.create({
   intervalRow: { flexDirection: 'row', gap: spacing.sm },
   intervalBtn: { flex: 1, paddingVertical: spacing.md, borderRadius: radius.md, borderWidth: 1, alignItems: 'center' },
   intervalText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
-  button: { height: 56, borderRadius: radius.lg, justifyContent: 'center', alignItems: 'center', marginTop: spacing.lg, shadowColor: '#FF3B30', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  button: { height: 56, borderRadius: radius.lg, justifyContent: 'center', alignItems: 'center', marginTop: spacing.lg },
   buttonText: { color: '#FFFFFF', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.lg, letterSpacing: 1 },
 });

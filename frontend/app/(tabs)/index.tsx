@@ -3,7 +3,6 @@ import { View, Text, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { useAuth } from '../../src/contexts/AuthContext';
 import { useThemeColors, spacing, radius, fontSize } from '../../src/constants/theme';
 import { api } from '../../src/services/api';
 import * as Haptics from 'expo-haptics';
@@ -11,11 +10,10 @@ import { format } from 'date-fns';
 
 type Task = { id: string; title: string; is_completed_today: boolean };
 type Goal = { id: string; title: string; milestones: any[]; is_active: boolean };
-type Reminder = { id: string; title: string; interval_type: string; interval_value: number; specific_time?: string };
+type Reminder = { id: string; title: string; interval_type: string; interval_value: number };
 type Quote = { text: string; author: string };
 
 export default function HomeScreen() {
-  const { user } = useAuth();
   const colors = useThemeColors();
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -52,10 +50,11 @@ export default function HomeScreen() {
     } catch {}
   };
 
-  const activeGoal = goals.find(g => g.is_active);
+  const activeGoal = goals.find(g => g.is_active) || goals[0];
   const completedToday = tasks.filter(t => t.is_completed_today).length;
   const totalTasks = tasks.length;
-  const nextReminder = reminders.find(r => r);
+  const nextReminder = reminders[0];
+  const hasNoData = goals.length === 0 && tasks.length === 0 && reminders.length === 0;
 
   if (loading) {
     return (
@@ -83,7 +82,7 @@ export default function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={[styles.greeting, { color: colors.textSecondary }]}>{format(new Date(), 'EEEE, MMM d')}</Text>
-            <Text style={[styles.userName, { color: colors.textPrimary }]}>Hi, {user?.name?.split(' ')[0] || 'there'}</Text>
+            <Text style={[styles.appName, { color: colors.textPrimary }]}>DISCIPLINE OS</Text>
           </View>
           <View style={styles.streakBadge}>
             <Ionicons name="flame" size={20} color={colors.accent} />
@@ -99,24 +98,45 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Progress Overview */}
-        <View style={styles.progressRow}>
-          <View testID="tasks-progress-card" style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.progressNumber, { color: colors.accent }]}>{completedToday}/{totalTasks}</Text>
-            <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>Tasks Done</Text>
+        {/* First-use welcome state */}
+        {hasNoData && (
+          <View testID="welcome-state" style={[styles.welcomeCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Ionicons name="rocket-outline" size={36} color={colors.accent} />
+            <Text style={[styles.welcomeTitle, { color: colors.textPrimary }]}>Your journey starts here</Text>
+            <Text style={[styles.welcomeDesc, { color: colors.textSecondary }]}>Set a goal, add daily tasks, and build unstoppable discipline.</Text>
+            <View style={styles.welcomeActions}>
+              <TouchableOpacity testID="welcome-create-goal-btn" style={[styles.welcomeBtn, { backgroundColor: colors.accent }]} onPress={() => router.push('/create-goal')} activeOpacity={0.8}>
+                <Ionicons name="trophy-outline" size={18} color="#fff" />
+                <Text style={styles.welcomeBtnText}>Set a Goal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity testID="welcome-create-task-btn" style={[styles.welcomeBtnOutline, { borderColor: colors.border }]} onPress={() => router.push('/create-task')} activeOpacity={0.7}>
+                <Ionicons name="add" size={18} color={colors.textPrimary} />
+                <Text style={[styles.welcomeBtnOutlineText, { color: colors.textPrimary }]}>Add Task</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-          <View testID="goals-progress-card" style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.progressNumber, { color: colors.accent }]}>{stats?.total_goals || 0}</Text>
-            <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>Active Goals</Text>
+        )}
+
+        {/* Progress Overview - only show when there's data */}
+        {!hasNoData && (
+          <View style={styles.progressRow}>
+            <View testID="tasks-progress-card" style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.progressNumber, { color: colors.accent }]}>{completedToday}/{totalTasks}</Text>
+              <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>Tasks Done</Text>
+            </View>
+            <View testID="goals-count-card" style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.progressNumber, { color: colors.accent }]}>{goals.length}</Text>
+              <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>Active Goals</Text>
+            </View>
+            <View testID="milestones-count-card" style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.progressNumber, { color: colors.success }]}>{stats?.completed_milestones || 0}</Text>
+              <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>Milestones</Text>
+            </View>
           </View>
-          <View testID="milestones-progress-card" style={[styles.progressCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.progressNumber, { color: colors.success }]}>{stats?.completed_milestones || 0}</Text>
-            <Text style={[styles.progressLabel, { color: colors.textSecondary }]}>Milestones</Text>
-          </View>
-        </View>
+        )}
 
         {/* Active Goal */}
-        {activeGoal ? (
+        {activeGoal && (
           <TouchableOpacity
             testID="active-goal-card"
             style={[styles.goalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -128,37 +148,27 @@ export default function HomeScreen() {
               <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>CURRENT GOAL</Text>
             </View>
             <Text style={[styles.goalTitle, { color: colors.textPrimary }]}>{activeGoal.title}</Text>
-            <View style={styles.goalProgressBar}>
-              <View style={[styles.goalProgressBg, { backgroundColor: colors.surfaceHighlight }]}>
-                <View style={[styles.goalProgressFill, { backgroundColor: colors.accent, width: `${goalProgress * 100}%` }]} />
+            {milestonesTotal > 0 && (
+              <View style={styles.goalProgressBar}>
+                <View style={[styles.goalProgressBg, { backgroundColor: colors.surfaceHighlight }]}>
+                  <View style={[styles.goalProgressFill, { backgroundColor: colors.accent, width: `${goalProgress * 100}%` }]} />
+                </View>
+                <Text style={[styles.goalProgressText, { color: colors.textSecondary }]}>{milestonesDone}/{milestonesTotal}</Text>
               </View>
-              <Text style={[styles.goalProgressText, { color: colors.textSecondary }]}>{milestonesDone}/{milestonesTotal}</Text>
-            </View>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            testID="create-first-goal-btn"
-            style={[styles.emptyGoal, { backgroundColor: colors.surface, borderColor: colors.border }]}
-            onPress={() => router.push('/create-goal')}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="add-circle-outline" size={32} color={colors.textTertiary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Set your first goal</Text>
+            )}
           </TouchableOpacity>
         )}
 
         {/* Today's Tasks */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>TODAY'S TASKS</Text>
-            <TouchableOpacity testID="add-task-home-btn" onPress={() => router.push('/create-task')}>
-              <Ionicons name="add" size={24} color={colors.accent} />
-            </TouchableOpacity>
-          </View>
-          {tasks.length === 0 ? (
-            <Text style={[styles.emptyHint, { color: colors.textTertiary }]}>No tasks yet. Add your first task.</Text>
-          ) : (
-            tasks.slice(0, 5).map(task => (
+        {tasks.length > 0 && (
+          <View style={styles.section}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>TODAY'S TASKS</Text>
+              <TouchableOpacity testID="add-task-home-btn" onPress={() => router.push('/create-task')}>
+                <Ionicons name="add" size={24} color={colors.accent} />
+              </TouchableOpacity>
+            </View>
+            {tasks.slice(0, 5).map(task => (
               <TouchableOpacity
                 key={task.id}
                 testID={`task-item-${task.id}`}
@@ -171,9 +181,9 @@ export default function HomeScreen() {
                 </View>
                 <Text style={[styles.taskText, { color: task.is_completed_today ? colors.textTertiary : colors.textPrimary }, task.is_completed_today && styles.taskDone]}>{task.title}</Text>
               </TouchableOpacity>
-            ))
-          )}
-        </View>
+            ))}
+          </View>
+        )}
 
         {/* Next Reminder */}
         {nextReminder && (
@@ -189,7 +199,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Quick Actions */}
+        {/* Quick Actions - always visible */}
         <View style={styles.quickActions}>
           <TouchableOpacity testID="quick-add-goal-btn" style={[styles.quickBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => router.push('/create-goal')} activeOpacity={0.7}>
             <Ionicons name="trophy-outline" size={22} color={colors.accent} />
@@ -218,12 +228,20 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.md, marginBottom: spacing.lg },
   greeting: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm },
-  userName: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxxl, letterSpacing: 0.5 },
+  appName: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxxl, letterSpacing: 1 },
   streakBadge: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   streakText: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl },
   quoteCard: { padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.md },
   quoteText: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, lineHeight: 22, fontStyle: 'italic' },
   quoteAuthor: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs, marginTop: spacing.sm },
+  welcomeCard: { padding: spacing.xl, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.md, alignItems: 'center', gap: spacing.md },
+  welcomeTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xl, letterSpacing: 0.5 },
+  welcomeDesc: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, textAlign: 'center', lineHeight: 22 },
+  welcomeActions: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  welcomeBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.lg },
+  welcomeBtnText: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: fontSize.sm },
+  welcomeBtnOutline: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.lg, borderWidth: 1 },
+  welcomeBtnOutlineText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
   progressRow: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.md },
   progressCard: { flex: 1, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center' },
   progressNumber: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl },
@@ -236,12 +254,9 @@ const styles = StyleSheet.create({
   goalProgressBg: { flex: 1, height: 6, borderRadius: 3, overflow: 'hidden' },
   goalProgressFill: { height: '100%', borderRadius: 3, minWidth: 2 },
   goalProgressText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs },
-  emptyGoal: { padding: spacing.xl, borderRadius: radius.lg, borderWidth: 1, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md, gap: spacing.sm },
-  emptyText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
   section: { marginBottom: spacing.md },
   sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
   sectionTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.lg, letterSpacing: 1 },
-  emptyHint: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, textAlign: 'center', paddingVertical: spacing.lg },
   taskItem: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.sm, gap: spacing.md },
   checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
   taskText: { fontFamily: 'Inter_400Regular', fontSize: fontSize.base, flex: 1 },

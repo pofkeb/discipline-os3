@@ -4,18 +4,27 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../src/constants/theme';
+import { useSubscription, getLimits } from '../src/contexts/SubscriptionContext';
 import { api } from '../src/services/api';
 import * as Haptics from 'expo-haptics';
 
 export default function CreateTaskScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { plan } = useSubscription();
   const [title, setTitle] = useState('');
   const [loading, setLoading] = useState(false);
 
   const handleCreate = async () => {
     if (!title.trim()) {
       Alert.alert('Error', 'Please enter a task title');
+      return;
+    }
+    const tasks = await api.getTasks();
+    const limits = getLimits(plan);
+    if (tasks.length >= limits.maxTasks) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+      router.push('/paywall');
       return;
     }
     setLoading(true);
@@ -78,6 +87,6 @@ const styles = StyleSheet.create({
   form: { paddingHorizontal: spacing.lg, gap: spacing.sm },
   label: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xs, letterSpacing: 1, marginTop: spacing.sm },
   input: { height: 56, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: fontSize.base, fontFamily: 'Inter_400Regular', borderWidth: 1 },
-  button: { height: 56, borderRadius: radius.lg, justifyContent: 'center', alignItems: 'center', marginTop: spacing.lg, shadowColor: '#FF3B30', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  button: { height: 56, borderRadius: radius.lg, justifyContent: 'center', alignItems: 'center', marginTop: spacing.lg },
   buttonText: { color: '#FFFFFF', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.lg, letterSpacing: 1 },
 });

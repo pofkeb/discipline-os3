@@ -1,3 +1,5 @@
+import * as localStore from './localStore';
+
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
 class ApiService {
@@ -5,6 +7,10 @@ class ApiService {
 
   setToken(token: string | null) {
     this.token = token;
+  }
+
+  get isLocal(): boolean {
+    return !this.token;
   }
 
   private async request(path: string, options: RequestInit = {}) {
@@ -24,7 +30,7 @@ class ApiService {
     return res.json();
   }
 
-  // Auth
+  // Auth (always remote)
   register(email: string, password: string, name: string) {
     return this.request('/auth/register', {
       method: 'POST',
@@ -45,10 +51,12 @@ class ApiService {
 
   // Goals
   getGoals() {
+    if (this.isLocal) return localStore.getGoals();
     return this.request('/goals');
   }
 
   createGoal(title: string, description: string, target_date?: string) {
+    if (this.isLocal) return localStore.createGoal(title, description, target_date);
     return this.request('/goals', {
       method: 'POST',
       body: JSON.stringify({ title, description, target_date }),
@@ -56,10 +64,12 @@ class ApiService {
   }
 
   getGoal(id: string) {
+    if (this.isLocal) return localStore.getGoal(id);
     return this.request(`/goals/${id}`);
   }
 
   updateGoal(id: string, title: string, description: string, target_date?: string) {
+    if (this.isLocal) return localStore.updateGoal(id, title, description, target_date);
     return this.request(`/goals/${id}`, {
       method: 'PUT',
       body: JSON.stringify({ title, description, target_date }),
@@ -67,10 +77,12 @@ class ApiService {
   }
 
   deleteGoal(id: string) {
+    if (this.isLocal) return localStore.deleteGoal(id);
     return this.request(`/goals/${id}`, { method: 'DELETE' });
   }
 
   addMilestone(goalId: string, title: string) {
+    if (this.isLocal) return localStore.addMilestone(goalId, title);
     return this.request(`/goals/${goalId}/milestones`, {
       method: 'POST',
       body: JSON.stringify({ title }),
@@ -78,23 +90,23 @@ class ApiService {
   }
 
   toggleMilestone(goalId: string, milestoneId: string) {
-    return this.request(`/goals/${goalId}/milestones/${milestoneId}`, {
-      method: 'PUT',
-    });
+    if (this.isLocal) return localStore.toggleMilestone(goalId, milestoneId);
+    return this.request(`/goals/${goalId}/milestones/${milestoneId}`, { method: 'PUT' });
   }
 
   deleteMilestone(goalId: string, milestoneId: string) {
-    return this.request(`/goals/${goalId}/milestones/${milestoneId}`, {
-      method: 'DELETE',
-    });
+    if (this.isLocal) return localStore.deleteMilestone(goalId, milestoneId);
+    return this.request(`/goals/${goalId}/milestones/${milestoneId}`, { method: 'DELETE' });
   }
 
   // Tasks
   getTasks() {
+    if (this.isLocal) return localStore.getTasks();
     return this.request('/tasks');
   }
 
   createTask(title: string) {
+    if (this.isLocal) return localStore.createTask(title);
     return this.request('/tasks', {
       method: 'POST',
       body: JSON.stringify({ title }),
@@ -102,19 +114,23 @@ class ApiService {
   }
 
   deleteTask(id: string) {
+    if (this.isLocal) return localStore.deleteTask(id);
     return this.request(`/tasks/${id}`, { method: 'DELETE' });
   }
 
   toggleTask(id: string) {
+    if (this.isLocal) return localStore.toggleTask(id);
     return this.request(`/tasks/${id}/toggle`, { method: 'POST' });
   }
 
   // Reminders
   getReminders() {
+    if (this.isLocal) return localStore.getReminders();
     return this.request('/reminders');
   }
 
   createReminder(title: string, interval_type: string, interval_value: number, specific_time?: string) {
+    if (this.isLocal) return localStore.createReminder(title, interval_type, interval_value, specific_time);
     return this.request('/reminders', {
       method: 'POST',
       body: JSON.stringify({ title, interval_type, interval_value, specific_time }),
@@ -122,16 +138,19 @@ class ApiService {
   }
 
   deleteReminder(id: string) {
+    if (this.isLocal) return localStore.deleteReminder(id);
     return this.request(`/reminders/${id}`, { method: 'DELETE' });
   }
 
   // Stats
   getStats() {
+    if (this.isLocal) return localStore.getStats();
     return this.request('/stats');
   }
 
   // Quotes
   getDailyQuote() {
+    if (this.isLocal) return Promise.resolve(localStore.getDailyQuote());
     return this.request('/quotes/daily');
   }
 }

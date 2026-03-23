@@ -7,6 +7,7 @@ type User = { id: string; email: string; name: string; subscription: string };
 type AuthContextType = {
   user: User | null;
   token: string | null;
+  isGuest: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [isGuest, setIsGuest] = useState(true);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -33,6 +35,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userData = await api.getMe();
         setToken(storedToken);
         setUser(userData);
+        setIsGuest(false);
       }
     } catch {
       await AsyncStorage.removeItem('auth_token');
@@ -48,6 +51,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.setToken(res.token);
     setToken(res.token);
     setUser(res.user);
+    setIsGuest(false);
   };
 
   const register = async (email: string, password: string, name: string) => {
@@ -56,6 +60,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.setToken(res.token);
     setToken(res.token);
     setUser(res.user);
+    setIsGuest(false);
   };
 
   const logout = async () => {
@@ -63,17 +68,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     api.setToken(null);
     setToken(null);
     setUser(null);
+    setIsGuest(true);
   };
 
   const refreshUser = useCallback(async () => {
-    try {
-      const userData = await api.getMe();
-      setUser(userData);
-    } catch {}
-  }, []);
+    if (!isGuest) {
+      try {
+        const userData = await api.getMe();
+        setUser(userData);
+      } catch {}
+    }
+  }, [isGuest]);
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, token, isGuest, isLoading, login, register, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

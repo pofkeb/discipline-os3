@@ -88,6 +88,34 @@ export default function TasksScreen() {
     </TouchableOpacity>
   );
 
+  const renderEmptyTasks = () => (
+    <View style={styles.emptyContainer}>
+      <View style={[styles.emptyIconWrap, { backgroundColor: colors.accent + '12' }]}>
+        <Ionicons name="checkbox" size={36} color={colors.accent} />
+      </View>
+      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Add your first task</Text>
+      <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>Build habits one task at a time. Check them off daily to build your streak.</Text>
+      <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: colors.accent }]} onPress={() => router.push('/create-task')}>
+        <Ionicons name="add" size={20} color="#fff" />
+        <Text style={styles.emptyBtnText}>ADD TASK</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  const renderEmptyReminders = () => (
+    <View style={styles.emptyContainer}>
+      <View style={[styles.emptyIconWrap, { backgroundColor: colors.accent + '12' }]}>
+        <Ionicons name="notifications" size={36} color={colors.accent} />
+      </View>
+      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Set up reminders</Text>
+      <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>Stay on track with recurring prompts that keep you moving forward.</Text>
+      <TouchableOpacity style={[styles.emptyBtn, { backgroundColor: colors.accent }]} onPress={() => router.push('/create-reminder')}>
+        <Ionicons name="add" size={20} color="#fff" />
+        <Text style={styles.emptyBtnText}>ADD REMINDER</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
@@ -99,7 +127,6 @@ export default function TasksScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Tab Switcher */}
       <View style={[styles.tabs, { backgroundColor: colors.surface, borderColor: colors.border }]}>
         <TouchableOpacity
           testID="tasks-tab-btn"
@@ -120,21 +147,11 @@ export default function TasksScreen() {
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={colors.accent} /></View>
       ) : activeTab === 'tasks' ? (
-        tasks.length === 0 ? (
-          <View style={styles.center}>
-            <Ionicons name="checkbox-outline" size={48} color={colors.textTertiary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No tasks yet</Text>
-          </View>
-        ) : (
+        tasks.length === 0 ? renderEmptyTasks() : (
           <FlatList data={tasks} keyExtractor={i => i.id} renderItem={renderTask} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false} />
         )
       ) : (
-        reminders.length === 0 ? (
-          <View style={styles.center}>
-            <Ionicons name="notifications-outline" size={48} color={colors.textTertiary} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No reminders yet</Text>
-          </View>
-        ) : (
+        reminders.length === 0 ? renderEmptyReminders() : (
           <FlatList data={reminders} keyExtractor={i => i.id} renderItem={renderReminder} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false} />
         )
       )}
@@ -149,8 +166,13 @@ const styles = StyleSheet.create({
   tabs: { flexDirection: 'row', marginHorizontal: spacing.lg, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.md, overflow: 'hidden' },
   tab: { flex: 1, paddingVertical: spacing.sm + 2, alignItems: 'center', borderRadius: radius.sm },
   tabText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md },
-  emptyText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.base },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl },
+  emptyIconWrap: { width: 72, height: 72, borderRadius: 36, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.lg },
+  emptyTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl, letterSpacing: 0.5, marginBottom: spacing.sm },
+  emptyDesc: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl },
+  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.lg },
+  emptyBtnText: { color: '#fff', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.base, letterSpacing: 1 },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   taskItem: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.sm, gap: spacing.md },
   checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },

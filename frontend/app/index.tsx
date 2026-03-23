@@ -1,23 +1,31 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../src/contexts/AuthContext';
 import { useThemeColors } from '../src/constants/theme';
+import { isOnboardingComplete } from '../src/services/localStore';
 
 export default function Index() {
-  const { user, isLoading } = useAuth();
+  const { isLoading } = useAuth();
   const router = useRouter();
   const colors = useThemeColors();
+  const [checking, setChecking] = useState(true);
 
   useEffect(() => {
     if (!isLoading) {
-      if (user) {
-        router.replace('/(tabs)');
-      } else {
-        router.replace('/(auth)/login');
-      }
+      checkRoute();
     }
-  }, [isLoading, user]);
+  }, [isLoading]);
+
+  const checkRoute = async () => {
+    const onboarded = await isOnboardingComplete();
+    if (onboarded) {
+      router.replace('/(tabs)');
+    } else {
+      router.replace('/(onboarding)/welcome');
+    }
+    setChecking(false);
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>

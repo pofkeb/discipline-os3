@@ -8,7 +8,7 @@ import { api } from '../../src/services/api';
 import * as Haptics from 'expo-haptics';
 
 type Milestone = { id: string; title: string; is_completed: boolean };
-type Goal = { id: string; title: string; description: string; milestones: Milestone[]; is_active: boolean; created_at: string };
+type Goal = { id: string; title: string; description: string; milestones: Milestone[]; is_active: boolean };
 
 export default function GoalsScreen() {
   const colors = useThemeColors();
@@ -17,10 +17,7 @@ export default function GoalsScreen() {
   const [loading, setLoading] = useState(true);
 
   const loadGoals = useCallback(async () => {
-    try {
-      const data = await api.getGoals();
-      setGoals(data);
-    } catch {} finally { setLoading(false); }
+    try { setGoals(await api.getGoals()); } catch {} finally { setLoading(false); }
   }, []);
 
   useFocusEffect(useCallback(() => { loadGoals(); }, [loadGoals]));
@@ -64,6 +61,9 @@ export default function GoalsScreen() {
             <Text style={[styles.progressText, { color: colors.textSecondary }]}>{done}/{total} milestones</Text>
           </View>
         )}
+        {total === 0 && (
+          <Text style={[styles.noMilestones, { color: colors.textTertiary }]}>Tap to add milestones</Text>
+        )}
       </TouchableOpacity>
     );
   };
@@ -79,21 +79,19 @@ export default function GoalsScreen() {
       {loading ? (
         <View style={styles.center}><ActivityIndicator size="large" color={colors.accent} /></View>
       ) : goals.length === 0 ? (
-        <View style={styles.center}>
-          <Ionicons name="trophy-outline" size={48} color={colors.textTertiary} />
-          <Text style={[styles.emptyText, { color: colors.textSecondary }]}>No goals yet</Text>
+        <View style={styles.emptyContainer}>
+          <View style={[styles.emptyIconWrap, { backgroundColor: colors.accent + '12' }]}>
+            <Ionicons name="trophy" size={40} color={colors.accent} />
+          </View>
+          <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>Set your first goal</Text>
+          <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>Break it into milestones and track your progress toward something meaningful.</Text>
           <TouchableOpacity testID="create-first-goal-btn" style={[styles.emptyBtn, { backgroundColor: colors.accent }]} onPress={() => router.push('/create-goal')}>
+            <Ionicons name="add" size={20} color="#fff" />
             <Text style={styles.emptyBtnText}>CREATE GOAL</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <FlatList
-          data={goals}
-          keyExtractor={item => item.id}
-          renderItem={renderGoal}
-          contentContainerStyle={styles.list}
-          showsVerticalScrollIndicator={false}
-        />
+        <FlatList data={goals} keyExtractor={item => item.id} renderItem={renderGoal} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false} />
       )}
     </SafeAreaView>
   );
@@ -103,9 +101,12 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.md },
   title: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxxl, letterSpacing: 1 },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md },
-  emptyText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.base },
-  emptyBtn: { paddingHorizontal: spacing.lg, paddingVertical: spacing.md, borderRadius: radius.lg },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  emptyContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.xl },
+  emptyIconWrap: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.lg },
+  emptyTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl, letterSpacing: 0.5, marginBottom: spacing.sm },
+  emptyDesc: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, textAlign: 'center', lineHeight: 22, marginBottom: spacing.xl },
+  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, borderRadius: radius.lg },
   emptyBtnText: { color: '#fff', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.base, letterSpacing: 1 },
   list: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
   goalCard: { padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.md },
@@ -113,6 +114,7 @@ const styles = StyleSheet.create({
   goalInfo: { flex: 1 },
   goalTitle: { fontFamily: 'Inter_700Bold', fontSize: fontSize.lg },
   goalDesc: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, marginTop: 2 },
+  noMilestones: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, marginTop: spacing.sm, fontStyle: 'italic' },
   progressSection: { marginTop: spacing.md },
   progressBg: { height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: spacing.xs },
   progressFill: { height: '100%', borderRadius: 3, minWidth: 2 },
