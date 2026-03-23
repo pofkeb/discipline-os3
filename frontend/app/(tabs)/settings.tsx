@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,6 +7,7 @@ import { useAuth } from '../../src/contexts/AuthContext';
 import { useSubscription } from '../../src/contexts/SubscriptionContext';
 import { useThemeColors, spacing, radius, fontSize } from '../../src/constants/theme';
 import { api } from '../../src/services/api';
+import * as Haptics from 'expo-haptics';
 
 export default function SettingsScreen() {
   const colors = useThemeColors();
@@ -16,7 +17,6 @@ export default function SettingsScreen() {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Auth form state
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
   const [name, setName] = useState('');
@@ -30,20 +30,26 @@ export default function SettingsScreen() {
 
   const handleAuth = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all fields');
+      Alert.alert('Missing Fields', 'Please fill in all fields');
       return;
     }
     setAuthLoading(true);
     try {
       if (authMode === 'register') {
-        if (!name.trim()) { Alert.alert('Error', 'Please enter your name'); setAuthLoading(false); return; }
+        if (!name.trim()) { Alert.alert('Missing Name', 'Please enter your name'); setAuthLoading(false); return; }
         await register(email.trim(), password, name.trim());
       } else {
         await login(email.trim(), password);
       }
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowAuthForm(false);
-      Alert.alert('Success', authMode === 'register' ? 'Account created! Your data will sync to the cloud.' : 'Signed in! Your data is now synced.');
+      setName(''); setEmail(''); setPassword('');
+      Alert.alert(
+        authMode === 'register' ? 'Account Created' : 'Signed In',
+        authMode === 'register' ? 'Your data will now sync to the cloud.' : 'Your data is now synced.'
+      );
     } catch (e: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert('Error', e.message || 'Authentication failed');
     } finally {
       setAuthLoading(false);
@@ -51,159 +57,256 @@ export default function SettingsScreen() {
   };
 
   const handleLogout = () => {
-    Alert.alert('Sign Out', 'You\'ll switch to local mode. Your cloud data is safe.', [
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Alert.alert('Sign Out', 'You will switch to local mode. Your cloud data stays safe.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Sign Out', style: 'destructive', onPress: logout },
+      { text: 'Sign Out', style: 'destructive', onPress: () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        logout();
+      }},
     ]);
   };
 
   const handleRestore = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const restored = await restorePurchases();
-    Alert.alert(restored ? 'Restored!' : 'Nothing Found', restored ? 'Your Pro subscription has been restored.' : 'No previous purchases found.');
+    Haptics.notificationAsync(restored ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Warning);
+    Alert.alert(
+      restored ? 'Restored' : 'Nothing Found',
+      restored ? 'Your Pro subscription has been restored.' : 'No previous purchases found.'
+    );
   };
 
+  const SectionHeader = ({ title }: { title: string }) => (
+    <Text style={[styles.sectionHeader, { color: colors.textTertiary }]}>{title}</Text>
+  );
+
+  const SettingRow = ({ 
+    icon, 
+    label, 
+    sublabel,
+    onPress, 
+    rightElement,
+    destructive = false,
+    testID,
+  }: { 
+    icon: string; 
+    label: string; 
+    sublabel?: string;
+    onPress?: () => void; 
+    rightElement?: React.ReactNode;
+    destructive?: boolean;
+    testID?: string;
+  }) => (
+    <Pressable
+      testID={testID}
+      style={({ pressed }) => [
+        styles.settingRow,
+        { backgroundColor: pressed && onPress ? colors.surfaceHighlight : colors.surface },
+      ]}
+      onPress={onPress}
+      disabled={!onPress}
+    >
+      <View style={[styles.settingIconWrap, { backgroundColor: destructive ? colors.error + '15' : colors.accent + '12' }]}>
+        <Ionicons name={icon as any} size={18} color={destructive ? colors.error : colors.accent} />
+      </View>
+      <View style={styles.settingContent}>
+        <Text style={[styles.settingLabel, { color: destructive ? colors.error : colors.textPrimary }]}>
+          {label}
+        </Text>
+        {sublabel && (
+          <Text style={[styles.settingSublabel, { color: colors.textTertiary }]}>{sublabel}</Text>
+        )}
+      </View>
+      {rightElement || (onPress && <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />)}
+    </Pressable>
+  );
+
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>SETTINGS</Text>
+          
+          {/* Header */}
+          <View style={styles.header}>
+            <Text style={[styles.title, { color: colors.textPrimary }]}>Settings</Text>
+          </View>
 
           {/* Account Section */}
-          {isGuest ? (
-            !showAuthForm ? (
-              <TouchableOpacity
-                testID="sign-in-card"
-                style={[styles.authCard, { backgroundColor: colors.surface, borderColor: colors.accent }]}
-                onPress={() => setShowAuthForm(true)}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.authIconWrap, { backgroundColor: colors.accent + '12' }]}>
-                  <Ionicons name="cloud-upload-outline" size={24} color={colors.accent} />
-                </View>
-                <View style={styles.authCardContent}>
-                  <Text style={[styles.authCardTitle, { color: colors.textPrimary }]}>Back up your data</Text>
-                  <Text style={[styles.authCardDesc, { color: colors.textSecondary }]}>Create an account to sync across devices and protect your progress</Text>
-                </View>
-                <Ionicons name="chevron-forward" size={20} color={colors.accent} />
-              </TouchableOpacity>
-            ) : (
-              <View style={[styles.formCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={styles.formHeader}>
-                  <Text style={[styles.formTitle, { color: colors.textPrimary }]}>{authMode === 'register' ? 'Create Account' : 'Sign In'}</Text>
-                  <TouchableOpacity testID="close-auth-form-btn" onPress={() => setShowAuthForm(false)}>
-                    <Ionicons name="close" size={24} color={colors.textTertiary} />
+          <SectionHeader title="ACCOUNT" />
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            {isGuest ? (
+              !showAuthForm ? (
+                <Pressable
+                  testID="sign-in-card"
+                  style={({ pressed }) => [
+                    styles.accountPrompt,
+                    { backgroundColor: pressed ? colors.surfaceHighlight : 'transparent' },
+                  ]}
+                  onPress={() => setShowAuthForm(true)}
+                >
+                  <View style={[styles.accountIconWrap, { backgroundColor: colors.accent + '12' }]}>
+                    <Ionicons name="cloud-upload-outline" size={22} color={colors.accent} />
+                  </View>
+                  <View style={styles.accountPromptContent}>
+                    <Text style={[styles.accountPromptTitle, { color: colors.textPrimary }]}>Back up your data</Text>
+                    <Text style={[styles.accountPromptDesc, { color: colors.textSecondary }]}>
+                      Create an account to sync across devices
+                    </Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
+                </Pressable>
+              ) : (
+                <View style={styles.authForm}>
+                  <View style={styles.authFormHeader}>
+                    <Text style={[styles.authFormTitle, { color: colors.textPrimary }]}>
+                      {authMode === 'register' ? 'Create Account' : 'Sign In'}
+                    </Text>
+                    <TouchableOpacity testID="close-auth-form-btn" onPress={() => setShowAuthForm(false)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                      <Ionicons name="close" size={22} color={colors.textTertiary} />
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {authMode === 'register' && (
+                    <TextInput
+                      testID="settings-name-input"
+                      style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
+                      placeholder="Full Name"
+                      placeholderTextColor={colors.textTertiary}
+                      value={name}
+                      onChangeText={setName}
+                      autoCapitalize="words"
+                    />
+                  )}
+                  <TextInput
+                    testID="settings-email-input"
+                    style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
+                    placeholder="Email"
+                    placeholderTextColor={colors.textTertiary}
+                    value={email}
+                    onChangeText={setEmail}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <TextInput
+                    testID="settings-password-input"
+                    style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
+                    placeholder="Password"
+                    placeholderTextColor={colors.textTertiary}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                  />
+                  <TouchableOpacity
+                    testID="settings-auth-submit-btn"
+                    style={[styles.authBtn, { backgroundColor: colors.accent }]}
+                    onPress={handleAuth}
+                    disabled={authLoading}
+                    activeOpacity={0.8}
+                  >
+                    {authLoading ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.authBtnText}>{authMode === 'register' ? 'Create Account' : 'Sign In'}</Text>
+                    )}
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    testID="toggle-auth-mode-btn" 
+                    onPress={() => setAuthMode(authMode === 'register' ? 'login' : 'register')}
+                    style={styles.authSwitch}
+                  >
+                    <Text style={[styles.authSwitchText, { color: colors.textSecondary }]}>
+                      {authMode === 'register' ? 'Already have an account? ' : 'Need an account? '}
+                      <Text style={{ color: colors.accent, fontFamily: 'Inter_500Medium' }}>
+                        {authMode === 'register' ? 'Sign In' : 'Create one'}
+                      </Text>
+                    </Text>
                   </TouchableOpacity>
                 </View>
-                {authMode === 'register' && (
-                  <TextInput
-                    testID="settings-name-input"
-                    style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
-                    placeholder="Full Name"
-                    placeholderTextColor={colors.textTertiary}
-                    value={name}
-                    onChangeText={setName}
-                  />
-                )}
-                <TextInput
-                  testID="settings-email-input"
-                  style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
-                  placeholder="Email"
-                  placeholderTextColor={colors.textTertiary}
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-                <TextInput
-                  testID="settings-password-input"
-                  style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.textPrimary }]}
-                  placeholder="Password"
-                  placeholderTextColor={colors.textTertiary}
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry
-                />
-                <TouchableOpacity
-                  testID="settings-auth-submit-btn"
-                  style={[styles.authBtn, { backgroundColor: colors.accent }]}
-                  onPress={handleAuth}
-                  disabled={authLoading}
-                >
-                  {authLoading ? <ActivityIndicator color="#fff" /> : (
-                    <Text style={styles.authBtnText}>{authMode === 'register' ? 'CREATE ACCOUNT' : 'SIGN IN'}</Text>
-                  )}
-                </TouchableOpacity>
-                <TouchableOpacity testID="toggle-auth-mode-btn" onPress={() => setAuthMode(authMode === 'register' ? 'login' : 'register')}>
-                  <Text style={[styles.switchText, { color: colors.textSecondary }]}>
-                    {authMode === 'register' ? 'Already have an account? ' : 'Need an account? '}
-                    <Text style={{ color: colors.accent }}>
-                      {authMode === 'register' ? 'Sign In' : 'Create one'}
-                    </Text>
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )
-          ) : (
-            <View testID="user-info-card" style={[styles.userCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
-                <Text style={styles.avatarText}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text>
-              </View>
-              <View style={styles.userInfo}>
-                <Text style={[styles.userName, { color: colors.textPrimary }]}>{user?.name}</Text>
-                <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{user?.email}</Text>
-                <View style={styles.syncBadge}>
-                  <Ionicons name="cloud-done" size={14} color={colors.success} />
-                  <Text style={[styles.syncText, { color: colors.success }]}>Synced</Text>
+              )
+            ) : (
+              <View testID="user-info-card" style={styles.userCard}>
+                <View style={[styles.avatar, { backgroundColor: colors.accent }]}>
+                  <Text style={styles.avatarText}>{user?.name?.charAt(0)?.toUpperCase() || '?'}</Text>
+                </View>
+                <View style={styles.userInfo}>
+                  <View style={styles.userNameRow}>
+                    <Text style={[styles.userName, { color: colors.textPrimary }]}>{user?.name}</Text>
+                    {isPro && (
+                      <View style={[styles.proBadge, { backgroundColor: colors.accent }]}>
+                        <Text style={styles.proText}>PRO</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{user?.email}</Text>
+                  <View style={styles.syncBadge}>
+                    <Ionicons name="cloud-done" size={12} color={colors.success} />
+                    <Text style={[styles.syncText, { color: colors.success }]}>Synced to cloud</Text>
+                  </View>
                 </View>
               </View>
-              {isPro && (
-                <View style={[styles.proBadge, { backgroundColor: colors.accent }]}>
-                  <Text style={styles.proText}>PRO</Text>
-                </View>
-              )}
-            </View>
-          )}
+            )}
+          </View>
 
-          {/* Stats */}
-          {loading ? <ActivityIndicator color={colors.accent} style={{ marginVertical: spacing.lg }} /> : stats && (
+          {/* Stats Section */}
+          <SectionHeader title="YOUR PROGRESS" />
+          {loading ? (
+            <ActivityIndicator color={colors.accent} style={{ marginVertical: spacing.lg }} />
+          ) : stats && (
             <View style={styles.statsGrid}>
               <View testID="streak-stat" style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Ionicons name="flame" size={22} color={colors.accent} />
+                <Ionicons name="flame" size={20} color={colors.accent} />
                 <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{stats.streak}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Day Streak</Text>
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Day Streak</Text>
               </View>
               <View testID="completions-stat" style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Ionicons name="checkmark-done" size={22} color={colors.success} />
+                <Ionicons name="checkmark-done" size={20} color={colors.success} />
                 <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{stats.total_completions}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Done</Text>
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Completed</Text>
               </View>
               <View testID="goals-stat" style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Ionicons name="trophy" size={22} color={colors.accent} />
+                <Ionicons name="trophy" size={20} color={colors.accent} />
                 <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{stats.total_goals}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Goals</Text>
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Goals</Text>
               </View>
               <View testID="milestones-stat" style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Ionicons name="flag" size={22} color={colors.success} />
+                <Ionicons name="flag" size={20} color={colors.success} />
                 <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{stats.completed_milestones}</Text>
-                <Text style={[styles.statLabel, { color: colors.textSecondary }]}>Milestones</Text>
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Milestones</Text>
               </View>
             </View>
           )}
 
-          {/* Weekly Chart */}
+          {/* Weekly Activity */}
           {stats?.weekly_data && (
-            <View testID="weekly-chart" style={[styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[styles.chartTitle, { color: colors.textPrimary }]}>THIS WEEK</Text>
+            <View testID="weekly-chart" style={[styles.card, styles.chartCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.chartTitle, { color: colors.textSecondary }]}>This Week</Text>
               <View style={styles.barChart}>
                 {stats.weekly_data.map((d: any, i: number) => {
                   const maxCount = Math.max(...stats.weekly_data.map((x: any) => x.count), 1);
-                  const height = (d.count / maxCount) * 80;
+                  const height = (d.count / maxCount) * 60;
                   const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
                   const dayLabel = dayLabels[new Date(d.date + 'T12:00:00').getDay()];
+                  const isToday = new Date(d.date + 'T12:00:00').toDateString() === new Date().toDateString();
                   return (
                     <View key={i} style={styles.barCol}>
-                      <View style={[styles.bar, { height: Math.max(height, 4), backgroundColor: d.count > 0 ? colors.accent : colors.surfaceHighlight }]} />
-                      <Text style={[styles.barLabel, { color: colors.textTertiary }]}>{dayLabel}</Text>
+                      <View 
+                        style={[
+                          styles.bar, 
+                          { 
+                            height: Math.max(height, 4), 
+                            backgroundColor: d.count > 0 ? colors.accent : colors.surfaceHighlight,
+                          }
+                        ]} 
+                      />
+                      <Text style={[
+                        styles.barLabel, 
+                        { color: isToday ? colors.accent : colors.textTertiary },
+                        isToday && { fontFamily: 'Inter_600SemiBold' }
+                      ]}>
+                        {dayLabel}
+                      </Text>
                     </View>
                   );
                 })}
@@ -211,41 +314,65 @@ export default function SettingsScreen() {
             </View>
           )}
 
-          {/* Subscription */}
+          {/* Subscription Section */}
           {!isPro && (
-            <TouchableOpacity
-              testID="upgrade-pro-btn"
-              style={[styles.upgradeCard, { borderColor: colors.accent }]}
-              onPress={() => router.push('/paywall')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.upgradeContent}>
-                <Ionicons name="diamond" size={24} color={colors.accent} />
-                <View>
-                  <Text style={[styles.upgradeTitle, { color: colors.textPrimary }]}>Upgrade to Pro</Text>
-                  <Text style={[styles.upgradeSub, { color: colors.textSecondary }]}>Unlimited goals, tasks & more</Text>
-                </View>
+            <>
+              <SectionHeader title="SUBSCRIPTION" />
+              <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Pressable
+                  testID="upgrade-pro-btn"
+                  style={({ pressed }) => [
+                    styles.upgradeRow,
+                    { backgroundColor: pressed ? colors.surfaceHighlight : 'transparent' },
+                  ]}
+                  onPress={() => router.push('/paywall')}
+                >
+                  <View style={[styles.settingIconWrap, { backgroundColor: colors.accent + '12' }]}>
+                    <Ionicons name="diamond" size={18} color={colors.accent} />
+                  </View>
+                  <View style={styles.settingContent}>
+                    <Text style={[styles.settingLabel, { color: colors.textPrimary }]}>Upgrade to Pro</Text>
+                    <Text style={[styles.settingSublabel, { color: colors.textTertiary }]}>Unlimited goals, tasks & more</Text>
+                  </View>
+                  <View style={[styles.upgradeArrow, { backgroundColor: colors.accent }]}>
+                    <Ionicons name="arrow-forward" size={14} color="#fff" />
+                  </View>
+                </Pressable>
               </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.accent} />
-            </TouchableOpacity>
+            </>
           )}
 
-          {/* Action Items */}
-          <View style={styles.actions}>
-            <TouchableOpacity testID="restore-purchases-btn" style={[styles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handleRestore}>
-              <Ionicons name="refresh" size={20} color={colors.textPrimary} />
-              <Text style={[styles.actionText, { color: colors.textPrimary }]}>Restore Purchases</Text>
-            </TouchableOpacity>
-
+          {/* Actions Section */}
+          <SectionHeader title="MORE" />
+          <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <SettingRow
+              testID="restore-purchases-btn"
+              icon="refresh"
+              label="Restore Purchases"
+              sublabel="Recover previous subscriptions"
+              onPress={handleRestore}
+            />
             {!isGuest && (
-              <TouchableOpacity testID="logout-btn" style={[styles.actionBtn, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={handleLogout}>
-                <Ionicons name="log-out-outline" size={20} color={colors.error} />
-                <Text style={[styles.actionText, { color: colors.error }]}>Sign Out</Text>
-              </TouchableOpacity>
+              <>
+                <View style={[styles.divider, { backgroundColor: colors.border }]} />
+                <SettingRow
+                  testID="logout-btn"
+                  icon="log-out-outline"
+                  label="Sign Out"
+                  sublabel="Switch to local mode"
+                  onPress={handleLogout}
+                  destructive
+                />
+              </>
             )}
           </View>
 
-          <Text style={[styles.version, { color: colors.textTertiary }]}>Discipline OS v1.0.0</Text>
+          {/* Footer */}
+          <View style={styles.footer}>
+            <Text style={[styles.version, { color: colors.textTertiary }]}>Discipline OS v1.0.0</Text>
+            <Text style={[styles.footerNote, { color: colors.textTertiary }]}>Your data is stored locally first</Text>
+          </View>
+
           <View style={{ height: spacing.xxl }} />
         </ScrollView>
       </KeyboardAvoidingView>
@@ -256,45 +383,255 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   content: { paddingHorizontal: spacing.lg },
-  title: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxxl, letterSpacing: 1, paddingTop: spacing.md, marginBottom: spacing.lg },
-  authCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg, borderRadius: radius.lg, borderWidth: 2, marginBottom: spacing.lg, gap: spacing.md },
-  authIconWrap: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-  authCardContent: { flex: 1 },
-  authCardTitle: { fontFamily: 'Inter_700Bold', fontSize: fontSize.base },
-  authCardDesc: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, marginTop: 2, lineHeight: 20 },
-  formCard: { padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.lg, gap: spacing.sm },
-  formHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
-  formTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xl, letterSpacing: 1 },
-  input: { height: 48, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: fontSize.sm, fontFamily: 'Inter_400Regular', borderWidth: 1 },
-  authBtn: { height: 48, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center', marginTop: spacing.xs },
-  authBtnText: { color: '#FFFFFF', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.base, letterSpacing: 1 },
-  switchText: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, textAlign: 'center', marginTop: spacing.sm },
-  userCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.lg },
-  avatar: { width: 48, height: 48, borderRadius: 24, justifyContent: 'center', alignItems: 'center' },
-  avatarText: { color: '#fff', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xl },
-  userInfo: { flex: 1, marginLeft: spacing.md },
-  userName: { fontFamily: 'Inter_700Bold', fontSize: fontSize.lg },
-  userEmail: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, marginTop: 2 },
-  syncBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  syncText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs },
-  proBadge: { paddingHorizontal: spacing.sm + 2, paddingVertical: spacing.xs, borderRadius: radius.sm },
-  proText: { color: '#fff', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xs, letterSpacing: 1 },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
-  statCard: { width: '47%', flexGrow: 1, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', gap: spacing.xs },
-  statNumber: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl },
-  statLabel: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs },
-  chartCard: { padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.md, backgroundColor: 'transparent' },
-  chartTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.sm, letterSpacing: 1, marginBottom: spacing.md },
-  barChart: { flexDirection: 'row', justifyContent: 'space-around', alignItems: 'flex-end', height: 100 },
-  barCol: { alignItems: 'center', gap: spacing.xs },
-  bar: { width: 24, borderRadius: 4, minHeight: 4 },
-  barLabel: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs },
-  upgradeCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: spacing.lg, borderRadius: radius.lg, borderWidth: 2, marginBottom: spacing.md },
-  upgradeContent: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  upgradeTitle: { fontFamily: 'Inter_700Bold', fontSize: fontSize.base },
-  upgradeSub: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, marginTop: 2 },
-  actions: { gap: spacing.sm, marginBottom: spacing.lg },
-  actionBtn: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, gap: spacing.md },
-  actionText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.base },
-  version: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs, textAlign: 'center', marginTop: spacing.md },
+  header: {
+    paddingTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  title: {
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.xxl,
+    letterSpacing: 0.5,
+  },
+  sectionHeader: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.xs,
+    letterSpacing: 1,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    marginLeft: spacing.xs,
+  },
+  card: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  accountPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  accountIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  accountPromptContent: {
+    flex: 1,
+  },
+  accountPromptTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.base,
+  },
+  accountPromptDesc: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.sm,
+    marginTop: 2,
+  },
+  authForm: {
+    padding: spacing.md,
+  },
+  authFormHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  authFormTitle: {
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.lg,
+    letterSpacing: 0.5,
+  },
+  input: {
+    height: 48,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    fontSize: fontSize.sm,
+    fontFamily: 'Inter_400Regular',
+    borderWidth: 1,
+    marginBottom: spacing.sm,
+  },
+  authBtn: {
+    height: 48,
+    borderRadius: radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: spacing.xs,
+  },
+  authBtnText: {
+    color: '#FFFFFF',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.sm,
+  },
+  authSwitch: {
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+  },
+  authSwitchText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.sm,
+  },
+  userCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+  },
+  avatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    color: '#fff',
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.xl,
+  },
+  userInfo: {
+    flex: 1,
+    marginLeft: spacing.md,
+  },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  userName: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.base,
+  },
+  userEmail: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.sm,
+    marginTop: 2,
+  },
+  syncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  syncText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: fontSize.xs,
+  },
+  proBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+  },
+  proText: {
+    color: '#fff',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 10,
+    letterSpacing: 0.5,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+  },
+  statCard: {
+    width: '47%',
+    flexGrow: 1,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  statNumber: {
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.xl,
+  },
+  statLabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.xs,
+  },
+  chartCard: {
+    marginTop: spacing.sm,
+    padding: spacing.md,
+  },
+  chartTitle: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: fontSize.sm,
+    marginBottom: spacing.md,
+  },
+  barChart: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'flex-end',
+    height: 80,
+  },
+  barCol: {
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  bar: {
+    width: 28,
+    borderRadius: 4,
+    minHeight: 4,
+  },
+  barLabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.xs,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  settingIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  settingContent: {
+    flex: 1,
+  },
+  settingLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: fontSize.base,
+  },
+  settingSublabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.xs,
+    marginTop: 2,
+  },
+  divider: {
+    height: 1,
+    marginLeft: spacing.md + 36 + spacing.md,
+  },
+  upgradeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    gap: spacing.md,
+  },
+  upgradeArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  footer: {
+    alignItems: 'center',
+    marginTop: spacing.xl,
+    gap: spacing.xs,
+  },
+  version: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: fontSize.xs,
+  },
+  footerNote: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.xs,
+  },
 });

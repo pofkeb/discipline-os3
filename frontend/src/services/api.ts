@@ -2,6 +2,11 @@ import * as localStore from './localStore';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
+// Architecture: LOCAL-FIRST
+// All data operations go through localStore (AsyncStorage) as source of truth.
+// When authenticated, writes are mirrored to backend for future sync/backup.
+// Reads ALWAYS come from local. Backend is never required for core functionality.
+
 class ApiService {
   private token: string | null = null;
 
@@ -9,11 +14,11 @@ class ApiService {
     this.token = token;
   }
 
-  get isLocal(): boolean {
-    return !this.token;
+  get isAuthenticated(): boolean {
+    return !!this.token;
   }
 
-  private async request(path: string, options: RequestInit = {}) {
+  private async backendRequest(path: string, options: RequestInit = {}) {
     const url = `${BACKEND_URL}/api${path}`;
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -30,134 +35,122 @@ class ApiService {
     return res.json();
   }
 
-  // Auth (always remote)
+  // Mirror a write to backend (fire-and-forget, never blocks UI)
+  private mirrorToBackend(path: string, options: RequestInit = {}) {
+    if (!this.isAuthenticated) return;
+    this.backendRequest(path, options).catch(() => {});
+  }
+
+  // ─── Auth (always remote, the only required backend calls) ───
+
   register(email: string, password: string, name: string) {
-    return this.request('/auth/register', {
+    return this.backendRequest('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ email, password, name }),
     });
   }
 
   login(email: string, password: string) {
-    return this.request('/auth/login', {
+    return this.backendRequest('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     });
   }
 
   getMe() {
-    return this.request('/auth/me');
+    return this.backendRequest('/auth/me');
   }
 
-  // Goals
-  getGoals() {
-    if (this.isLocal) return localStore.getGoals();
-    return this.request('/goals');
+  // ─── Goals (always local-first) ───
+
+  getGoals() { return localStore.getGoals(); }
+
+  async createGoal(title: string, description: string, target_date?: string) {
+    const goal = await localStore.createGoal(title, description, target_date);
+    this.mirrorToBackend('/goals', { method: 'POST', body: JSON.stringify({ title, description, target_date }) });
+    return goal;
   }
 
-  createGoal(title: string, description: string, target_date?: string) {
-    if (this.isLocal) return localStore.createGoal(title, description, target_date);
-    return this.request('/goals', {
-      method: 'POST',
-      body: JSON.stringify({ title, description, target_date }),
-    });
+  getGoal(id: string) { return localStore.getGoal(id); }
+
+  async updateGoal(id: string, title: string, description: string, target_date?: string) {
+    const goal = await localStore.updateGoal(id, title, description, target_date);
+    this.mirrorToBackend(`/goals/${id}`, { method: 'PUT', body: JSON.stringify({ title, description, target_date }) });
+    return goal;
   }
 
-  getGoal(id: string) {
-    if (this.isLocal) return localStore.getGoal(id);
-    return this.request(`/goals/${id}`);
+  async deleteGoal(id: string) {
+    const res = await localStore.deleteGoal(id);
+    this.mirrorToBackend(`/goals/${id}`, { method: 'DELETE' });
+    return res;
   }
 
-  updateGoal(id: string, title: string, description: string, target_date?: string) {
-    if (this.isLocal) return localStore.updateGoal(id, title, description, target_date);
-    return this.request(`/goals/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify({ title, description, target_date }),
-    });
+  async addMilestone(goalId: string, title: string) {
+    const goal = await localStore.addMilestone(goalId, title);
+    this.mirrorToBackend(`/goals/${goalId}/milestones`, { method: 'POST', body: JSON.stringify({ title }) });
+    return goal;
   }
 
-  deleteGoal(id: string) {
-    if (this.isLocal) return localStore.deleteGoal(id);
-    return this.request(`/goals/${id}`, { method: 'DELETE' });
+  async toggleMilestone(goalId: string, milestoneId: string) {
+    const goal = await localStore.toggleMilestone(goalId, milestoneId);
+    this.mirrorToBackend(`/goals/${goalId}/milestones/${milestoneId}`, { method: 'PUT' });
+    return goal;
   }
 
-  addMilestone(goalId: string, title: string) {
-    if (this.isLocal) return localStore.addMilestone(goalId, title);
-    return this.request(`/goals/${goalId}/milestones`, {
-      method: 'POST',
-      body: JSON.stringify({ title }),
-    });
+  async deleteMilestone(goalId: string, milestoneId: string) {
+    const goal = await localStore.deleteMilestone(goalId, milestoneId);
+    this.mirrorToBackend(`/goals/${goalId}/milestones/${milestoneId}`, { method: 'DELETE' });
+    return goal;
   }
 
-  toggleMilestone(goalId: string, milestoneId: string) {
-    if (this.isLocal) return localStore.toggleMilestone(goalId, milestoneId);
-    return this.request(`/goals/${goalId}/milestones/${milestoneId}`, { method: 'PUT' });
+  // ─── Tasks (always local-first) ───
+
+  getTasks() { return localStore.getTasks(); }
+
+  async createTask(title: string) {
+    const task = await localStore.createTask(title);
+    this.mirrorToBackend('/tasks', { method: 'POST', body: JSON.stringify({ title }) });
+    return task;
   }
 
-  deleteMilestone(goalId: string, milestoneId: string) {
-    if (this.isLocal) return localStore.deleteMilestone(goalId, milestoneId);
-    return this.request(`/goals/${goalId}/milestones/${milestoneId}`, { method: 'DELETE' });
+  async deleteTask(id: string) {
+    const res = await localStore.deleteTask(id);
+    this.mirrorToBackend(`/tasks/${id}`, { method: 'DELETE' });
+    return res;
   }
 
-  // Tasks
-  getTasks() {
-    if (this.isLocal) return localStore.getTasks();
-    return this.request('/tasks');
+  async toggleTask(id: string) {
+    const res = await localStore.toggleTask(id);
+    this.mirrorToBackend(`/tasks/${id}/toggle`, { method: 'POST' });
+    return res;
   }
 
-  createTask(title: string) {
-    if (this.isLocal) return localStore.createTask(title);
-    return this.request('/tasks', {
-      method: 'POST',
-      body: JSON.stringify({ title }),
-    });
+  // ─── Reminders (always local-first) ───
+
+  getReminders() { return localStore.getReminders(); }
+
+  async createReminder(title: string, interval_type: string, interval_value: number, specific_time?: string, note?: string) {
+    const rem = await localStore.createReminder(title, interval_type, interval_value, specific_time, note);
+    this.mirrorToBackend('/reminders', { method: 'POST', body: JSON.stringify({ title, note: note || '', interval_type, interval_value, specific_time }) });
+    return rem;
   }
 
-  deleteTask(id: string) {
-    if (this.isLocal) return localStore.deleteTask(id);
-    return this.request(`/tasks/${id}`, { method: 'DELETE' });
+  async deleteReminder(id: string) {
+    const res = await localStore.deleteReminder(id);
+    this.mirrorToBackend(`/reminders/${id}`, { method: 'DELETE' });
+    return res;
   }
 
-  toggleTask(id: string) {
-    if (this.isLocal) return localStore.toggleTask(id);
-    return this.request(`/tasks/${id}/toggle`, { method: 'POST' });
+  async toggleReminderActive(id: string) {
+    const res = await localStore.toggleReminderActive(id);
+    this.mirrorToBackend(`/reminders/${id}/toggle`, { method: 'POST' });
+    return res;
   }
 
-  // Reminders
-  getReminders() {
-    if (this.isLocal) return localStore.getReminders();
-    return this.request('/reminders');
-  }
+  // ─── Stats & Quotes (always local) ───
 
-  createReminder(title: string, interval_type: string, interval_value: number, specific_time?: string, note?: string) {
-    if (this.isLocal) return localStore.createReminder(title, interval_type, interval_value, specific_time, note);
-    return this.request('/reminders', {
-      method: 'POST',
-      body: JSON.stringify({ title, note: note || '', interval_type, interval_value, specific_time }),
-    });
-  }
-
-  deleteReminder(id: string) {
-    if (this.isLocal) return localStore.deleteReminder(id);
-    return this.request(`/reminders/${id}`, { method: 'DELETE' });
-  }
-
-  toggleReminderActive(id: string) {
-    if (this.isLocal) return localStore.toggleReminderActive(id);
-    return this.request(`/reminders/${id}/toggle`, { method: 'POST' });
-  }
-
-  // Stats
-  getStats() {
-    if (this.isLocal) return localStore.getStats();
-    return this.request('/stats');
-  }
-
-  // Quotes
-  getDailyQuote() {
-    if (this.isLocal) return Promise.resolve(localStore.getDailyQuote());
-    return this.request('/quotes/daily');
-  }
+  getStats() { return localStore.getStats(); }
+  getDailyQuote() { return Promise.resolve(localStore.getDailyQuote()); }
 }
 
 export const api = new ApiService();
