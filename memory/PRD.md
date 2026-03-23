@@ -6,26 +6,36 @@
 ## Architecture
 - **Frontend**: Expo SDK 54, React Native, expo-router (file-based routing)
 - **Backend**: FastAPI + MongoDB (motor async driver)
-- **Auth**: JWT-based email/password authentication
+- **Auth**: Optional JWT-based email/password (moved to Settings)
+- **Guest Mode**: Full app functionality via AsyncStorage (localStore.ts)
+- **Data Layer**: Dual-mode api.ts - routes to local storage (guest) or backend API (authenticated)
 - **Subscription**: Mock RevenueCat integration (ready for real SDK plug-in)
 - **Design**: Monochrome with Electric Blaze (#FF3B30) accent, system theme detection
 
+## Key Architecture Decision: Guest-First
+- App opens directly to onboarding → home screen (NO auth gate)
+- All features work without creating an account
+- Data stored locally via AsyncStorage in guest mode
+- Auth is optional, positioned as "Back up your data" in Settings
+- When authenticated, data syncs via backend API automatically
+
 ## Features (MVP)
-### Authentication
-- Email/password registration and login
-- JWT token-based sessions (7-day expiry)
-- Structured for future Google/Apple sign-in
+
+### Onboarding Flow (3 screens)
+1. **Welcome**: Brand intro with "Build your system. Own your day." tagline
+2. **Start**: Choose how to begin - Create own goal, Use a template (3 pre-built), or Explore
+3. **Notifications**: Optional notification permission setup
 
 ### Goals & Milestones
 - Create goals with title and description
 - Add/toggle/delete milestones within goals
-- Visual roadmap progress bar
-- Goal detail screen with numbered milestone badges
+- Visual roadmap progress bar with numbered milestone badges
+- 3 pre-built goal templates (Morning Routine, 30-Day Fitness, Learn a Skill)
 
 ### Daily Tasks
 - Create daily tasks
 - Toggle task completion (per day tracking)
-- Visual checkbox with strikethrough animation
+- Visual checkbox with strikethrough
 - Long-press to delete
 
 ### Recurring Reminders
@@ -37,28 +47,46 @@
 - Consecutive day streak tracking
 - Total completions, goals, milestones counters
 - Weekly activity bar chart
-- Profile page with all stats
+- Stats displayed in Settings screen
 
 ### Motivational Quotes
-- 30+ curated discipline/productivity quotes
+- 24+ curated discipline/productivity quotes
 - Daily rotating quote on home dashboard
-- Structured for future AI-generated quote swap
+- Works offline in guest mode
 
 ### Subscription (MOCKED)
 - Free plan: 1 goal, 10 tasks, 3 reminders
 - Pro plan: Unlimited everything + advanced stats
+- Paywall triggered when free limits hit (not on app open)
 - Paywall with yearly ($29.99) and monthly ($4.99) options
 - Restore purchases flow
 - **Entitlement**: discipline_os_pro
 - **Offering**: default with monthly/yearly packages
-- Ready for real RevenueCat integration
+
+### Auth (Optional, in Settings)
+- JWT email/password registration and login
+- Positioned as "Back up your data" / "Sync across devices"
+- Inline auth form within Settings (not a separate screen)
+- Toggle between login/register modes
+- Cloud sync badge when authenticated
 
 ## Navigation
-- 4-tab layout: Home, Goals, Tasks, Profile
+- 4-tab layout: Home, Goals, Tasks, Settings
 - Modal screens: Create Goal, Create Task, Create Reminder, Paywall
-- Stack screens: Goal Detail
+- Stack screens: Goal Detail, Onboarding
 
-## API Endpoints
+## Premium Empty States
+- Goals: Trophy icon + "Set your first goal" + description + CTA
+- Tasks: Checkbox icon + "Add your first task" + description + CTA
+- Reminders: Bell icon + "Set up reminders" + description + CTA
+- Home: "Your journey starts here" welcome card with dual CTAs
+
+## Data Flow
+- **Guest Mode**: localStore.ts → AsyncStorage (all CRUD operations)
+- **Authenticated Mode**: api.ts → FastAPI backend → MongoDB
+- **Switching**: api.ts auto-routes based on auth token presence
+
+## API Endpoints (Backend - unchanged)
 - `POST /api/auth/register` - Register user
 - `POST /api/auth/login` - Login user
 - `GET /api/auth/me` - Get current user
@@ -73,20 +101,13 @@
 - `DELETE /api/reminders/{id}` - Delete reminder
 - `GET /api/stats` - Get user stats
 - `GET /api/quotes/daily` - Get daily quote
-- `GET /api/health` - Health check
-
-## Data Model (MongoDB)
-- **users**: id, email, password_hash, name, subscription, created_at
-- **goals**: id, user_id, title, description, target_date, is_active, milestones[], created_at
-- **tasks**: id, user_id, title, created_at
-- **task_completions**: id, task_id, user_id, date, completed_at
-- **reminders**: id, user_id, title, interval_type, interval_value, specific_time, is_active, created_at
 
 ## Future Enhancements
 - Real RevenueCat integration
 - Google/Apple social auth
 - AI-generated motivational quotes
-- Calendar/history view
-- Widgets support
+- Calendar/history view with date picker
+- Home screen widgets
 - Push notifications for reminders
-- Cloud sync and sharing
+- Data migration from local to cloud on sign-up
+- Sharing features
