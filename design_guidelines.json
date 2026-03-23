@@ -1,0 +1,160 @@
+{
+  "identity": {
+    "name": "Discipline OS",
+    "tone": "Uncompromising, Premium, High-Performance, Minimalist",
+    "archetype": "The Performance Pro",
+    "keywords": ["Obsidian", "Precision", "Tactical", "Focus"]
+  },
+  "typography": {
+    "font_families": {
+      "headings": "BarlowCondensed_700Bold",
+      "body": "Inter_400Regular",
+      "body_medium": "Inter_500Medium",
+      "body_bold": "Inter_700Bold",
+      "mono": "Menlo"
+    },
+    "installation_command": "npx expo install @expo-google-fonts/barlow-condensed @expo-google-fonts/inter",
+    "scale": {
+      "xs": 12,
+      "sm": 14,
+      "base": 16,
+      "lg": 18,
+      "xl": 20,
+      "2xl": 24,
+      "3xl": 30,
+      "4xl": 36,
+      "5xl": 48
+    },
+    "letter_spacing": {
+      "tight": -0.5,
+      "normal": 0,
+      "wide": 1.0
+    }
+  },
+  "colors": {
+    "light": {
+      "background": "#F2F2F7",
+      "surface": "#FFFFFF",
+      "surface_highlight": "#F9F9FB",
+      "text_primary": "#000000",
+      "text_secondary": "#6C6C70",
+      "text_tertiary": "#AEAEB2",
+      "border": "#E5E5EA",
+      "accent": "#FF3B30",
+      "success": "#34C759",
+      "error": "#FF3B30"
+    },
+    "dark": {
+      "background": "#000000",
+      "surface": "#1C1C1E",
+      "surface_highlight": "#2C2C2E",
+      "text_primary": "#FFFFFF",
+      "text_secondary": "#8E8E93",
+      "text_tertiary": "#48484A",
+      "border": "#38383A",
+      "accent": "#FF453A",
+      "success": "#30D158",
+      "error": "#FF453A"
+    },
+    "universal": {
+      "brand_primary": "#FF3B30",
+      "brand_secondary": "#FFFFFF",
+      "overlay": "rgba(0,0,0,0.5)"
+    }
+  },
+  "spacing": {
+    "xs": 4,
+    "sm": 8,
+    "md": 16,
+    "lg": 24,
+    "xl": 32,
+    "2xl": 48,
+    "3xl": 64
+  },
+  "layout": {
+    "border_radius": {
+      "sm": 8,
+      "md": 12,
+      "lg": 16,
+      "xl": 24,
+      "pill": 9999
+    },
+    "container_padding": 20,
+    "safe_area_top": 44
+  },
+  "components": {
+    "buttons": {
+      "primary": {
+        "height": 56,
+        "borderRadius": 16,
+        "justifyContent": "center",
+        "alignItems": "center",
+        "shadowOpacity": 0.2,
+        "shadowRadius": 8,
+        "shadowOffset": { "width": 0, "height": 4 }
+      },
+      "secondary": {
+        "height": 56,
+        "borderRadius": 16,
+        "justifyContent": "center",
+        "alignItems": "center",
+        "borderWidth": 1,
+        "backgroundColor": "transparent"
+      }
+    },
+    "cards": {
+      "default": {
+        "padding": 20,
+        "borderRadius": 16,
+        "marginBottom": 16,
+        "borderWidth": 1
+      },
+      "interactive": {
+        "activeOpacity": 0.7
+      }
+    },
+    "inputs": {
+      "height": 56,
+      "borderRadius": 12,
+      "paddingHorizontal": 16,
+      "fontSize": 16,
+      "borderWidth": 1
+    }
+  },
+  "icons": {
+    "library": "Ionicons",
+    "preferred_set": ["checkmark-circle", "ellipse-outline", "trophy-outline", "calendar-outline", "settings-outline", "add", "close", "chevron-forward"]
+  },
+  "visual_enhancers": {
+    "blur_intensity": 20,
+    "glass_style": "light",
+    "haptics": {
+      "success": "notificationAsync(Haptics.NotificationFeedbackType.Success)",
+      "light": "impactAsync(Haptics.ImpactFeedbackStyle.Light)",
+      "medium": "impactAsync(Haptics.ImpactFeedbackStyle.Medium)"
+    }
+  },
+  "images": {
+    "hero_backgrounds": [
+      "https://images.unsplash.com/photo-1649182784901-48f5f2d40ecc?crop=entropy&cs=srgb&fm=jpg&q=85",
+      "https://images.unsplash.com/photo-1640346876473-f76a73c71539?crop=entropy&cs=srgb&fm=jpg&q=85"
+    ],
+    "goal_motivation": [
+      "https://images.pexels.com/photos/325790/pexels-photo-325790.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "https://images.unsplash.com/photo-1515483496561-fae43e6d49e8?crop=entropy&cs=srgb&fm=jpg&q=85"
+    ]
+  },
+  "universal_guidelines": [
+    "Use StyleSheet.create() for all styles. Do NOT use inline styles heavily.",
+    "Implement 'The Tinted Grey Rule': Never use pure #808080. Tint greys with blue (Cool) or orange (Warm).",
+    "Use 'Barlow Condensed' for all headings (24px+). Use 'Inter' for body text.",
+    "Buttons must have haptic feedback onPress.",
+    "Lists must use 'FlashList' or 'FlatList' with proper keyExtractor.",
+    "Respect Safe Area Context. Wrap main screens in <SafeAreaView>.",
+    "Use 'react-native-reanimated' for layout transitions (entering/exiting).",
+    "Dark Mode is primary. Test heavily on Dark Mode.",
+    "Avoid gradients. Use solid high-contrast blocks.",
+    "Use 'expo-blur' for glassmorphism on floating headers or tab bars.",
+    "Use data-testid on all interactive elements."
+  ]
+}
