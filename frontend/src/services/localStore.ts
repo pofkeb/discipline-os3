@@ -157,6 +157,11 @@ export async function toggleTask(id: string) {
 
 // ─── Reminders ───
 
+import {
+  scheduleReminderNotification,
+  cancelReminderNotification,
+} from './notifications';
+
 export async function getReminders(): Promise<any[]> {
   return getItem(KEYS.reminders, []);
 }
@@ -175,10 +180,17 @@ export async function createReminder(title: string, interval_type: string, inter
   };
   reminders.unshift(reminder);
   await setItem(KEYS.reminders, reminders);
+  
+  // Schedule notification for this reminder
+  await scheduleReminderNotification(reminder);
+  
   return reminder;
 }
 
 export async function deleteReminder(id: string) {
+  // Cancel notification before deleting
+  await cancelReminderNotification(id);
+  
   const reminders = await getReminders();
   await setItem(KEYS.reminders, reminders.filter((r: any) => r.id !== id));
   return { success: true };
@@ -190,6 +202,14 @@ export async function toggleReminderActive(id: string) {
   if (!r) throw new Error('Reminder not found');
   r.is_active = !r.is_active;
   await setItem(KEYS.reminders, reminders);
+  
+  // Schedule or cancel notification based on new state
+  if (r.is_active) {
+    await scheduleReminderNotification(r);
+  } else {
+    await cancelReminderNotification(id);
+  }
+  
   return { is_active: r.is_active };
 }
 

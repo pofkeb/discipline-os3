@@ -7,6 +7,7 @@ import { useThemeColors, spacing, radius, fontSize } from '../src/constants/them
 import { useSubscription, getLimits } from '../src/contexts/SubscriptionContext';
 import { api } from '../src/services/api';
 import * as Haptics from 'expo-haptics';
+import { requestNotificationPermission, getNotificationPermissionStatus } from '../src/services/notifications';
 
 type RepeatType = 'minutes' | 'hours' | 'specific';
 
@@ -76,6 +77,21 @@ export default function CreateReminderScreen() {
       router.push('/paywall');
       return;
     }
+    
+    // Request notification permission if not already granted
+    const permStatus = await getNotificationPermissionStatus();
+    if (permStatus !== 'granted') {
+      const granted = await requestNotificationPermission();
+      if (!granted) {
+        // Still create the reminder, but warn user
+        Alert.alert(
+          'Notifications Disabled',
+          'Your reminder was saved but notifications are disabled. Enable them in Settings to receive alerts.',
+          [{ text: 'OK' }]
+        );
+      }
+    }
+    
     setLoading(true);
     try {
       const time = repeatType === 'specific' ? specificTime : undefined;

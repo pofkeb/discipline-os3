@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,6 +8,7 @@ import { useSubscription } from '../../src/contexts/SubscriptionContext';
 import { useThemeColors, spacing, radius, fontSize } from '../../src/constants/theme';
 import { api } from '../../src/services/api';
 import * as Haptics from 'expo-haptics';
+import { getNotificationPermissionStatus, requestNotificationPermission, syncAllReminderNotifications } from '../../src/services/notifications';
 
 export default function SettingsScreen() {
   const colors = useThemeColors();
@@ -16,6 +17,7 @@ export default function SettingsScreen() {
   const { isPro, restorePurchases } = useSubscription();
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [notificationStatus, setNotificationStatus] = useState<'granted' | 'denied' | 'undetermined'>('undetermined');
 
   const [showAuthForm, setShowAuthForm] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
@@ -26,6 +28,7 @@ export default function SettingsScreen() {
 
   useFocusEffect(useCallback(() => {
     api.getStats().then(setStats).catch(() => {}).finally(() => setLoading(false));
+    getNotificationPermissionStatus().then(setNotificationStatus);
   }, []));
 
   const handleAuth = async () => {
@@ -75,6 +78,57 @@ export default function SettingsScreen() {
       restored ? 'Restored' : 'Nothing Found',
       restored ? 'Your Pro subscription has been restored.' : 'No previous purchases found.'
     );
+  };
+
+  const handleNotifications = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    
+    if (notificationStatus === 'granted') {
+      // Already granted - offer to open settings or sync
+      Alert.alert(
+        'Notifications Enabled',
+        'Notifications are already enabled. Would you like to sync your reminders?',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Sync Now', 
+            onPress: async () => {
+              const reminders = await api.getReminders();
+              await syncAllReminderNotifications(reminders);
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              Alert.alert('Synced', 'Your reminder notifications have been updated.');
+            }
+          },
+        ]
+      );
+    } else if (notificationStatus === 'denied') {
+      // Previously denied - guide to settings
+      Alert.alert(
+        'Notifications Disabled',
+        'To receive reminder alerts, please enable notifications in your device settings.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { 
+            text: 'Open Settings', 
+            onPress: () => Linking.openSettings()
+          },
+        ]
+      );
+    } else {
+      // Undetermined - request permission
+      const granted = await requestNotificationPermission();
+      setNotificationStatus(granted ? 'granted' : 'denied');
+      
+      if (granted) {
+        // Sync existing reminders
+        const reminders = await api.getReminders();
+        await syncAllReminderNotifications(reminders);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        Alert.alert('Enabled', 'Notifications enabled! Your reminders will now alert you.');
+      } else {
+        Alert.alert('Not Enabled', 'You can enable notifications later from Settings.');
+      }
+    }
   };
 
   const SectionHeader = ({ title }: { title: string }) => (
@@ -345,6 +399,26 @@ export default function SettingsScreen() {
           {/* Actions Section */}
           <SectionHeader title="MORE" />
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <SettingRow
+              testID="notifications-btn"
+              icon="notifications-outline"
+              label="Notifications"
+              sublabel={
+                notificationStatus === 'granted' 
+                  ? 'Enabled' 
+                  : notificationStatus === 'denied' 
+                    ? 'Disabled - Tap to enable'
+                    : 'Tap to enable'
+              }
+              onPress={handleNotifications}
+              rightElement={
+                <View style={[
+                  styles.statusDot,
+                  { backgroundColor: notificationStatus === 'granted' ? colors.success : colors.textTertiary }
+                ]} />
+              }
+            />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <SettingRow
               testID="restore-purchases-btn"
               icon="refresh"
@@ -633,5 +707,10 @@ const styles = StyleSheet.create({
   footerNote: {
     fontFamily: 'Inter_400Regular',
     fontSize: fontSize.xs,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
 });
