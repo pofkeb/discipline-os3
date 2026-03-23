@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator, Alert, Switch } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -8,7 +8,7 @@ import { api } from '../../src/services/api';
 import * as Haptics from 'expo-haptics';
 
 type Task = { id: string; title: string; is_completed_today: boolean };
-type Reminder = { id: string; title: string; interval_type: string; interval_value: number; is_active: boolean };
+type Reminder = { id: string; title: string; note?: string; interval_type: string; interval_value: number; specific_time?: string; is_active: boolean };
 
 export default function TasksScreen() {
   const colors = useThemeColors();
@@ -54,6 +54,36 @@ export default function TasksScreen() {
     ]);
   };
 
+  const toggleReminderActive = async (id: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const res = await api.toggleReminderActive(id);
+    setReminders(prev => prev.map(r => r.id === id ? { ...r, is_active: res.is_active } : r));
+  };
+
+  const getNextDue = (item: Reminder): string => {
+    if (!item.is_active) return 'Paused';
+    const now = new Date();
+    if (item.interval_type === 'specific' && item.specific_time) {
+      const [h, m] = item.specific_time.split(':').map(Number);
+      const next = new Date(now);
+      next.setHours(h, m, 0, 0);
+      if (next <= now) next.setDate(next.getDate() + 1);
+      const diff = next.getTime() - now.getTime();
+      const hrs = Math.floor(diff / 3600000);
+      const mins = Math.floor((diff % 3600000) / 60000);
+      if (hrs > 0) return `Next in ${hrs}h ${mins}m`;
+      return `Next in ${mins}m`;
+    }
+    if (item.interval_type === 'minutes') return `Next in ${item.interval_value}m`;
+    if (item.interval_type === 'hours') return `Next in ${item.interval_value}h`;
+    return '';
+  };
+
+  const getRepeatLabel = (item: Reminder): string => {
+    if (item.interval_type === 'specific' && item.specific_time) return `Daily at ${item.specific_time}`;
+    return `Every ${item.interval_value} ${item.interval_type}`;
+  };
+
   const renderTask = ({ item }: { item: Task }) => (
     <TouchableOpacity
       testID={`task-row-${item.id}`}
@@ -69,24 +99,55 @@ export default function TasksScreen() {
     </TouchableOpacity>
   );
 
-  const renderReminder = ({ item }: { item: Reminder }) => (
-    <TouchableOpacity
-      testID={`reminder-row-${item.id}`}
-      style={[styles.reminderItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      onLongPress={() => deleteReminder(item.id)}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.reminderIcon, { backgroundColor: colors.accent + '15' }]}>
-        <Ionicons name="notifications" size={18} color={colors.accent} />
+  const renderReminder = ({ item }: { item: Reminder }) => {
+    const nextDue = getNextDue(item);
+    const repeatLabel = getRepeatLabel(item);
+    const iconName = item.interval_type === 'specific' ? 'alarm' : item.interval_type === 'minutes' ? 'timer' : 'time';
+
+    return (
+      <View
+        testID={`reminder-row-${item.id}`}
+        style={[styles.reminderCard, { backgroundColor: colors.surface, borderColor: colors.border }, !item.is_active && { opacity: 0.55 }]}
+      >
+        <View style={styles.reminderTop}>
+          <View style={[styles.reminderIconBg, { backgroundColor: item.is_active ? colors.accent + '15' : colors.surfaceHighlight }]}>
+            <Ionicons name={iconName as any} size={20} color={item.is_active ? colors.accent : colors.textTertiary} />
+          </View>
+          <View style={styles.reminderBody}>
+            <Text style={[styles.reminderTitle, { color: colors.textPrimary }]}>{item.title}</Text>
+            {item.note ? <Text style={[styles.reminderNote, { color: colors.textSecondary }]} numberOfLines={1}>{item.note}</Text> : null}
+          </View>
+          <Switch
+            testID={`reminder-toggle-${item.id}`}
+            value={item.is_active}
+            onValueChange={() => toggleReminderActive(item.id)}
+            trackColor={{ false: colors.surfaceHighlight, true: colors.accent + '55' }}
+            thumbColor={item.is_active ? colors.accent : colors.textTertiary}
+          />
+        </View>
+        <View style={styles.reminderBottom}>
+          <View style={styles.reminderMeta}>
+            <Ionicons name="repeat" size={13} color={colors.textTertiary} />
+            <Text style={[styles.reminderMetaText, { color: colors.textTertiary }]}>{repeatLabel}</Text>
+          </View>
+          {nextDue ? (
+            <View style={styles.reminderMeta}>
+              <Ionicons name="time-outline" size={13} color={item.is_active ? colors.accent : colors.textTertiary} />
+              <Text style={[styles.reminderMetaText, { color: item.is_active ? colors.accent : colors.textTertiary }]}>{nextDue}</Text>
+            </View>
+          ) : null}
+        </View>
+        <TouchableOpacity
+          testID={`reminder-delete-${item.id}`}
+          style={styles.reminderDeleteBtn}
+          onPress={() => deleteReminder(item.id)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="trash-outline" size={16} color={colors.textTertiary} />
+        </TouchableOpacity>
       </View>
-      <View style={styles.reminderInfo}>
-        <Text style={[styles.reminderTitle, { color: colors.textPrimary }]}>{item.title}</Text>
-        <Text style={[styles.reminderSub, { color: colors.textSecondary }]}>
-          Every {item.interval_value} {item.interval_type}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   const renderEmptyTasks = () => (
     <View style={styles.emptyContainer}>
@@ -178,9 +239,14 @@ const styles = StyleSheet.create({
   checkbox: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
   taskText: { fontFamily: 'Inter_400Regular', fontSize: fontSize.base, flex: 1 },
   taskDone: { textDecorationLine: 'line-through' },
-  reminderItem: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginBottom: spacing.sm, gap: spacing.md },
-  reminderIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
-  reminderInfo: { flex: 1 },
+  reminderCard: { padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, marginBottom: spacing.sm, position: 'relative' as const },
+  reminderTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  reminderIconBg: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center' },
+  reminderBody: { flex: 1 },
   reminderTitle: { fontFamily: 'Inter_500Medium', fontSize: fontSize.base },
-  reminderSub: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, marginTop: 2 },
+  reminderNote: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, marginTop: 2 },
+  reminderBottom: { flexDirection: 'row', gap: spacing.lg, marginTop: spacing.sm, paddingLeft: 52 },
+  reminderMeta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reminderMetaText: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs },
+  reminderDeleteBtn: { position: 'absolute' as const, bottom: spacing.md, right: spacing.md },
 });

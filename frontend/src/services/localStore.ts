@@ -161,11 +161,12 @@ export async function getReminders(): Promise<any[]> {
   return getItem(KEYS.reminders, []);
 }
 
-export async function createReminder(title: string, interval_type: string, interval_value: number, specific_time?: string) {
+export async function createReminder(title: string, interval_type: string, interval_value: number, specific_time?: string, note?: string) {
   const reminders = await getReminders();
   const reminder = {
     id: generateId(),
     title,
+    note: note || '',
     interval_type,
     interval_value,
     specific_time: specific_time || null,
@@ -181,6 +182,15 @@ export async function deleteReminder(id: string) {
   const reminders = await getReminders();
   await setItem(KEYS.reminders, reminders.filter((r: any) => r.id !== id));
   return { success: true };
+}
+
+export async function toggleReminderActive(id: string) {
+  const reminders = await getReminders();
+  const r = reminders.find((r: any) => r.id === id);
+  if (!r) throw new Error('Reminder not found');
+  r.is_active = !r.is_active;
+  await setItem(KEYS.reminders, reminders);
+  return { is_active: r.is_active };
 }
 
 // ─── Stats ───

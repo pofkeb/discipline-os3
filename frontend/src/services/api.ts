@@ -129,17 +129,22 @@ class ApiService {
     return this.request('/reminders');
   }
 
-  createReminder(title: string, interval_type: string, interval_value: number, specific_time?: string) {
-    if (this.isLocal) return localStore.createReminder(title, interval_type, interval_value, specific_time);
+  createReminder(title: string, interval_type: string, interval_value: number, specific_time?: string, note?: string) {
+    if (this.isLocal) return localStore.createReminder(title, interval_type, interval_value, specific_time, note);
     return this.request('/reminders', {
       method: 'POST',
-      body: JSON.stringify({ title, interval_type, interval_value, specific_time }),
+      body: JSON.stringify({ title, note: note || '', interval_type, interval_value, specific_time }),
     });
   }
 
   deleteReminder(id: string) {
     if (this.isLocal) return localStore.deleteReminder(id);
     return this.request(`/reminders/${id}`, { method: 'DELETE' });
+  }
+
+  toggleReminderActive(id: string) {
+    if (this.isLocal) return localStore.toggleReminderActive(id);
+    return this.request(`/reminders/${id}/toggle`, { method: 'POST' });
   }
 
   // Stats

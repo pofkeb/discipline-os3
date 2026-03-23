@@ -91,7 +91,8 @@ class TaskInput(BaseModel):
 
 class ReminderInput(BaseModel):
     title: str
-    interval_type: str = 'hours'  # minutes, hours, daily, specific
+    note: str = ''
+    interval_type: str = 'hours'  # minutes, hours, specific
     interval_value: int = 1
     specific_time: Optional[str] = None
 
@@ -294,6 +295,7 @@ async def create_reminder(input: ReminderInput, user=Depends(get_current_user)):
         'id': reminder_id,
         'user_id': user['id'],
         'title': input.title,
+        'note': input.note,
         'interval_type': input.interval_type,
         'interval_value': input.interval_value,
         'specific_time': input.specific_time,
@@ -310,6 +312,7 @@ async def update_reminder(reminder_id: str, input: ReminderInput, user=Depends(g
         {'id': reminder_id, 'user_id': user['id']},
         {'$set': {
             'title': input.title,
+            'note': input.note,
             'interval_type': input.interval_type,
             'interval_value': input.interval_value,
             'specific_time': input.specific_time
@@ -326,6 +329,15 @@ async def delete_reminder(reminder_id: str, user=Depends(get_current_user)):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail='Reminder not found')
     return {'success': True}
+
+@api_router.post("/reminders/{reminder_id}/toggle")
+async def toggle_reminder_active(reminder_id: str, user=Depends(get_current_user)):
+    reminder = await db.reminders.find_one({'id': reminder_id, 'user_id': user['id']}, {'_id': 0})
+    if not reminder:
+        raise HTTPException(status_code=404, detail='Reminder not found')
+    new_state = not reminder.get('is_active', True)
+    await db.reminders.update_one({'id': reminder_id}, {'$set': {'is_active': new_state}})
+    return {'is_active': new_state}
 
 # ─── Stats Routes ───
 
