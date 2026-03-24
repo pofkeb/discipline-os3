@@ -5,6 +5,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../src/constants/theme';
 import { useSubscription, getLimits } from '../src/contexts/SubscriptionContext';
+import { incrementPaywallHits } from '../src/config/revenuecat';
 import { api } from '../src/services/api';
 import * as Haptics from 'expo-haptics';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../src/services/notifications';
@@ -83,7 +84,9 @@ export default function CreateReminderScreen() {
       const limits = getLimits(plan);
       if (reminders.length >= limits.maxReminders) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        router.push('/paywall'); return;
+        const hits = await incrementPaywallHits();
+        router.push({ pathname: '/paywall', params: { reason: 'reminder_limit', hits: String(hits) } } as any);
+        return;
       }
     }
     const permStatus = await getNotificationPermissionStatus();

@@ -42,6 +42,38 @@ export const FALLBACK_MONTHLY_PRICE          = '$4.99/mo';
 export const FALLBACK_ANNUAL_PRICE           = '$29.99/yr';
 export const FALLBACK_ANNUAL_MONTHLY_EQUIV   = '$2.50/mo';
 
+// ─── Future Offer Identifiers ─────────────────────────────────────────────────
+// RevenueCat supports multiple named offerings for intro / promo / win-back flows.
+// Create these in the RC dashboard, then activate with:
+//   const offer = offerings?.all[RC_INTRO_OFFERING_ID] ?? offerings?.current;
+//   // use offer.monthly / offer.annual / offer.availablePackages as usual
+//
+// TODO: Configure these in your RC dashboard before activating them in the paywall.
+export const RC_INTRO_OFFERING_ID   = 'intro_offer';   // Trial / introductory pricing
+export const RC_PROMO_OFFERING_ID   = 'promo_offer';   // Promotional / seasonal discount
+export const RC_WINBACK_OFFERING_ID = 'winback_offer'; // Re-engagement / win-back campaign
+
+// ─── Paywall hit tracking ─────────────────────────────────────────────────────
+// Tracks how many times a free user has hit a usage limit.
+// The paywall uses this to show stronger copy on repeat encounters.
+const PAYWALL_HITS_KEY = '@dos/paywall_hits';
+
+/**
+ * Increments and returns the cumulative paywall hit count for this device.
+ * Safe to call before every `router.push('/paywall')`.
+ */
+export async function incrementPaywallHits(): Promise<number> {
+  try {
+    const AsyncStorage = (await import('@react-native-async-storage/async-storage')).default;
+    const stored = await AsyncStorage.getItem(PAYWALL_HITS_KEY);
+    const next   = (stored ? parseInt(stored, 10) : 0) + 1;
+    await AsyncStorage.setItem(PAYWALL_HITS_KEY, String(next));
+    return next;
+  } catch {
+    return 1;
+  }
+}
+
 // ─── Helper ───────────────────────────────────────────────────────────────────
 /**
  * Returns the correct platform-specific RevenueCat API key.

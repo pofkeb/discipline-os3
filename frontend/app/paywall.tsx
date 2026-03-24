@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../src/constants/theme';
 import { useSubscription } from '../src/contexts/SubscriptionContext';
@@ -38,6 +38,23 @@ export default function PaywallScreen() {
   const router  = useRouter();
   const { purchasePackage, restorePurchases, isLoading, offerings, rcAvailable } = useSubscription();
   const [selected, setSelected] = useState<'yearly' | 'monthly'>('yearly');
+
+  // ── Route params (set by trigger sites) ────────────────────────────────────
+  // reason: which limit was hit — 'goal_limit' | 'task_limit' | 'reminder_limit'
+  // hits:   cumulative paywall encounter count — drives stronger copy on repeat hits
+  const { reason, hits: hitsStr } = useLocalSearchParams<{ reason?: string; hits?: string }>();
+  const hitCount    = hitsStr ? parseInt(hitsStr, 10) : 1;
+  const isRepeatHit = hitCount >= 2;
+
+  const contextMessage: string | null =
+    reason === 'goal_limit'     ? 'You\'ve reached the free goal limit'
+    : reason === 'task_limit'   ? 'You\'ve reached the free task limit'
+    : reason === 'reminder_limit' ? 'You\'ve reached the free reminder limit'
+    : null;
+
+  const heroTagline = isRepeatHit
+    ? 'Remove the limits. Keep building.'
+    : 'Unlock your full potential';
 
   // ── Derive prices from RC offerings or fallback ────────────────────────────
 
@@ -129,8 +146,11 @@ export default function PaywallScreen() {
           <View style={[s.proBadge, { backgroundColor: colors.accent }]}>
             <Text style={s.proBadgeText}>PRO</Text>
           </View>
+          {contextMessage && (
+            <Text style={[s.contextMsg, { color: colors.accent }]}>{contextMessage}</Text>
+          )}
           <Text style={[s.heroTagline, { color: colors.textSecondary }]}>
-            Unlock your full potential
+            {heroTagline}
           </Text>
         </View>
 
@@ -227,12 +247,12 @@ export default function PaywallScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ── Preview mode notice (only shown in Expo Go / web) ─────────────── */}
-        {!rcAvailable && (
+        {/* ── Preview mode notice — dev/Expo Go only ───────────────────────── */}
+        {__DEV__ && !rcAvailable && (
           <View style={[s.previewNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="information-circle-outline" size={14} color={colors.textTertiary} />
             <Text style={[s.previewText, { color: colors.textTertiary }]}>
-              Preview mode — prices are estimates. Real billing requires an EAS / native build.
+              Dev mode — prices are estimates. Real billing requires an EAS / native build.
             </Text>
           </View>
         )}
@@ -341,6 +361,12 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       fontFamily: 'Inter_400Regular',
       fontSize: fontSize.base,
       marginTop: spacing.md,
+    },
+    contextMsg: {
+      fontFamily: 'Inter_600SemiBold',
+      fontSize: fontSize.sm,
+      marginTop: spacing.md,
+      textAlign: 'center',
     },
 
     // ── Divider ───────────────────────────────────────────────────────────────

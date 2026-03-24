@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../src/constants/theme';
 import { useSubscription, getLimits } from '../src/contexts/SubscriptionContext';
+import { incrementPaywallHits } from '../src/config/revenuecat';
 import { api } from '../src/services/api';
 import * as Haptics from 'expo-haptics';
 
@@ -25,7 +26,8 @@ export default function CreateGoalScreen() {
     const limits = getLimits(plan);
     if (goals.length >= limits.maxGoals) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      router.push('/paywall');
+      const hits = await incrementPaywallHits();
+      router.push({ pathname: '/paywall', params: { reason: 'goal_limit', hits: String(hits) } } as any);
       return;
     }
     setLoading(true);
