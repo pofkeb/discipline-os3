@@ -1,133 +1,507 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Alert } from 'react-native';
+import React, { useState, useMemo } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Alert,
+  ScrollView,
+  Platform,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../src/constants/theme';
 import { useSubscription } from '../src/contexts/SubscriptionContext';
+import {
+  FALLBACK_MONTHLY_PRICE,
+  FALLBACK_ANNUAL_PRICE,
+  FALLBACK_ANNUAL_MONTHLY_EQUIV,
+} from '../src/config/revenuecat';
 import * as Haptics from 'expo-haptics';
 
+// ─── Feature list ────────────────────────────────────────────────────────────
+
 const FEATURES = [
-  'Unlimited goals & milestones',
-  'Unlimited daily tasks',
-  'Unlimited reminders',
-  'Advanced stats & analytics',
-  'Full history & calendar',
-  'Premium motivational quotes',
-  'Future widget support',
+  { icon: 'trophy-outline',           text: 'Unlimited goals & milestones' },
+  { icon: 'checkmark-done-outline',   text: 'Unlimited daily tasks' },
+  { icon: 'notifications-outline',    text: 'Unlimited reminders' },
+  { icon: 'bar-chart-outline',        text: 'Advanced stats & analytics' },
+  { icon: 'calendar-outline',         text: 'Full history & calendar access' },
+  { icon: 'bulb-outline',             text: 'Premium motivational content' },
+  { icon: 'phone-portrait-outline',   text: 'Future widget support' },
 ];
 
+// ─── Screen ──────────────────────────────────────────────────────────────────
+
 export default function PaywallScreen() {
-  const colors = useThemeColors();
-  const router = useRouter();
-  const { purchasePackage, isLoading } = useSubscription();
+  const colors  = useThemeColors();
+  const router  = useRouter();
+  const { purchasePackage, restorePurchases, isLoading, offerings, rcAvailable } = useSubscription();
   const [selected, setSelected] = useState<'yearly' | 'monthly'>('yearly');
+
+  // ── Derive prices from RC offerings or fallback ────────────────────────────
+
+  const { monthlyPrice, annualPrice, annualMonthlyEquiv } = useMemo(() => {
+    if (rcAvailable && offerings?.current) {
+      const monthly = offerings.current.monthly;
+      const annual  = offerings.current.annual;
+      return {
+        monthlyPrice:        monthly?.product?.priceString  ?? FALLBACK_MONTHLY_PRICE,
+        annualPrice:         annual?.product?.priceString   ?? FALLBACK_ANNUAL_PRICE,
+        annualMonthlyEquiv:  annual?.product?.pricePerMonth
+          ? `${annual.product.pricePerMonth}/mo`
+          : FALLBACK_ANNUAL_MONTHLY_EQUIV,
+      };
+    }
+    return {
+      monthlyPrice:       FALLBACK_MONTHLY_PRICE,
+      annualPrice:        FALLBACK_ANNUAL_PRICE,
+      annualMonthlyEquiv: FALLBACK_ANNUAL_MONTHLY_EQUIV,
+    };
+  }, [rcAvailable, offerings]);
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handlePurchase = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       await purchasePackage(selected);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert('Welcome to Pro!', 'You now have unlimited access to all features.', [
-        { text: 'Continue', onPress: () => router.back() },
-      ]);
-    } catch {
-      Alert.alert('Error', 'Purchase failed. Please try again.');
+      Alert.alert(
+        'Welcome to Pro!',
+        'You now have unlimited access to all features.',
+        [{ text: 'Start now', onPress: () => router.back() }]
+      );
+    } catch (err: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert(
+        'Purchase Failed',
+        err?.message ?? 'Something went wrong. Please try again.',
+        [{ text: 'OK' }]
+      );
     }
   };
 
-  return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-      <View style={styles.container}>
-        <TouchableOpacity testID="close-paywall-btn" style={styles.closeBtn} onPress={() => router.back()}>
-          <Ionicons name="close" size={28} color={colors.textPrimary} />
-        </TouchableOpacity>
+  const handleRestore = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const restored = await restorePurchases();
+    if (restored) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert('Restored', 'Your Pro subscription has been restored.', [
+        { text: 'Continue', onPress: () => router.back() },
+      ]);
+    } else {
+      Alert.alert('Nothing Found', 'No previous purchases were found for this account.');
+    }
+  };
 
-        <View style={styles.hero}>
-          <Ionicons name="diamond" size={48} color={colors.accent} />
-          <Text style={[styles.heroTitle, { color: colors.textPrimary }]}>DISCIPLINE OS</Text>
-          <Text style={[styles.heroSub, { color: colors.accent }]}>PRO</Text>
-          <Text style={[styles.heroDesc, { color: colors.textSecondary }]}>Unlock your full potential</Text>
+  // ── Styles (dynamic) ───────────────────────────────────────────────────────
+
+  const s = useMemo(() => makeStyles(colors), [colors]);
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+
+  return (
+    <SafeAreaView style={[s.safe, { backgroundColor: colors.background }]} edges={['top', 'bottom']}>
+
+      {/* Close button */}
+      <TouchableOpacity
+        testID="close-paywall-btn"
+        style={s.closeBtn}
+        onPress={() => router.back()}
+        hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+      >
+        <Ionicons name="close" size={22} color={colors.textSecondary} />
+      </TouchableOpacity>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={s.scroll}
+        bounces={Platform.OS === 'ios'}
+      >
+        {/* ── Hero ─────────────────────────────────────────────────────────── */}
+        <View style={s.hero}>
+          <View style={[s.iconRing, { borderColor: colors.accent + '30', backgroundColor: colors.accent + '10' }]}>
+            <Ionicons name="diamond" size={36} color={colors.accent} />
+          </View>
+
+          <Text style={[s.brandName, { color: colors.textPrimary }]}>DISCIPLINE OS</Text>
+          <View style={[s.proBadge, { backgroundColor: colors.accent }]}>
+            <Text style={s.proBadgeText}>PRO</Text>
+          </View>
+          <Text style={[s.heroTagline, { color: colors.textSecondary }]}>
+            Unlock your full potential
+          </Text>
         </View>
 
-        <View style={styles.features}>
+        {/* ── Divider ──────────────────────────────────────────────────────── */}
+        <View style={[s.divider, { backgroundColor: colors.border }]} />
+
+        {/* ── Features ─────────────────────────────────────────────────────── */}
+        <View style={s.featuresBlock}>
+          <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>WHAT YOU GET</Text>
           {FEATURES.map((f, i) => (
-            <View key={i} style={styles.featureRow}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.accent} />
-              <Text style={[styles.featureText, { color: colors.textPrimary }]}>{f}</Text>
+            <View key={i} style={s.featureRow}>
+              <View style={[s.featureIconWrap, { backgroundColor: colors.accent + '12' }]}>
+                <Ionicons name={f.icon as any} size={15} color={colors.accent} />
+              </View>
+              <Text style={[s.featureText, { color: colors.textPrimary }]}>{f.text}</Text>
             </View>
           ))}
         </View>
 
-        <View style={styles.plans}>
+        {/* ── Divider ──────────────────────────────────────────────────────── */}
+        <View style={[s.divider, { backgroundColor: colors.border }]} />
+
+        {/* ── Plan selector ────────────────────────────────────────────────── */}
+        <View style={s.plansBlock}>
+          <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>CHOOSE YOUR PLAN</Text>
+
+          {/* Yearly card */}
           <TouchableOpacity
             testID="yearly-plan-btn"
-            style={[styles.planCard, { borderColor: selected === 'yearly' ? colors.accent : colors.border, backgroundColor: colors.surface }]}
-            onPress={() => setSelected('yearly')}
-            activeOpacity={0.7}
+            style={[
+              s.planCard,
+              {
+                borderColor:     selected === 'yearly' ? colors.accent : colors.border,
+                backgroundColor: selected === 'yearly' ? colors.accent + '08' : colors.surface,
+              },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setSelected('yearly');
+            }}
+            activeOpacity={0.75}
           >
-            <View style={styles.planTop}>
-              <Text style={[styles.planName, { color: colors.textPrimary }]}>Yearly</Text>
-              <View style={[styles.saveBadge, { backgroundColor: colors.accent }]}>
-                <Text style={styles.saveText}>SAVE 50%</Text>
+            <View style={s.planCardLeft}>
+              <View style={s.planCardTitleRow}>
+                <Text style={[s.planName, { color: colors.textPrimary }]}>Yearly</Text>
+                <View style={[s.bestValueBadge, { backgroundColor: colors.accent }]}>
+                  <Text style={s.bestValueText}>BEST VALUE</Text>
+                </View>
               </View>
+              <Text style={[s.planSubtitle, { color: colors.textTertiary }]}>
+                {annualMonthlyEquiv} · billed annually
+              </Text>
             </View>
-            <Text style={[styles.planPrice, { color: colors.textPrimary }]}>$29.99<Text style={[styles.planPer, { color: colors.textSecondary }]}>/year</Text></Text>
-            <Text style={[styles.planMonthly, { color: colors.textTertiary }]}>$2.50/month</Text>
+            <View style={s.planCardRight}>
+              <Text style={[s.planPrice, { color: colors.textPrimary }]}>{annualPrice}</Text>
+            </View>
+            {selected === 'yearly' && (
+              <View style={[s.selectedDot, { backgroundColor: colors.accent }]}>
+                <Ionicons name="checkmark" size={12} color="#fff" />
+              </View>
+            )}
           </TouchableOpacity>
 
+          {/* Monthly card */}
           <TouchableOpacity
             testID="monthly-plan-btn"
-            style={[styles.planCard, { borderColor: selected === 'monthly' ? colors.accent : colors.border, backgroundColor: colors.surface }]}
-            onPress={() => setSelected('monthly')}
-            activeOpacity={0.7}
+            style={[
+              s.planCard,
+              {
+                borderColor:     selected === 'monthly' ? colors.accent : colors.border,
+                backgroundColor: selected === 'monthly' ? colors.accent + '08' : colors.surface,
+              },
+            ]}
+            onPress={() => {
+              Haptics.selectionAsync();
+              setSelected('monthly');
+            }}
+            activeOpacity={0.75}
           >
-            <Text style={[styles.planName, { color: colors.textPrimary }]}>Monthly</Text>
-            <Text style={[styles.planPrice, { color: colors.textPrimary }]}>$4.99<Text style={[styles.planPer, { color: colors.textSecondary }]}>/month</Text></Text>
+            <View style={s.planCardLeft}>
+              <Text style={[s.planName, { color: colors.textPrimary }]}>Monthly</Text>
+              <Text style={[s.planSubtitle, { color: colors.textTertiary }]}>
+                billed monthly
+              </Text>
+            </View>
+            <View style={s.planCardRight}>
+              <Text style={[s.planPrice, { color: colors.textPrimary }]}>{monthlyPrice}</Text>
+            </View>
+            {selected === 'monthly' && (
+              <View style={[s.selectedDot, { backgroundColor: colors.accent }]}>
+                <Ionicons name="checkmark" size={12} color="#fff" />
+              </View>
+            )}
           </TouchableOpacity>
         </View>
 
+        {/* ── Preview mode notice (only shown in Expo Go / web) ─────────────── */}
+        {!rcAvailable && (
+          <View style={[s.previewNotice, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Ionicons name="information-circle-outline" size={14} color={colors.textTertiary} />
+            <Text style={[s.previewText, { color: colors.textTertiary }]}>
+              Preview mode — prices are estimates. Real billing requires an EAS / native build.
+            </Text>
+          </View>
+        )}
+
+        {/* ── CTA ──────────────────────────────────────────────────────────── */}
         <TouchableOpacity
           testID="purchase-btn"
-          style={[styles.purchaseBtn, { backgroundColor: colors.accent }]}
+          style={[s.ctaBtn, { backgroundColor: colors.accent }, isLoading && s.ctaBtnDisabled]}
           onPress={handlePurchase}
           disabled={isLoading}
-          activeOpacity={0.8}
+          activeOpacity={0.85}
         >
-          {isLoading ? <ActivityIndicator color="#fff" /> : (
-            <Text style={styles.purchaseText}>START {selected === 'yearly' ? 'YEARLY' : 'MONTHLY'} PLAN</Text>
+          {isLoading ? (
+            <ActivityIndicator color="#fff" size="small" />
+          ) : (
+            <>
+              <Ionicons name="diamond" size={16} color="#fff" style={{ marginRight: spacing.sm }} />
+              <Text style={s.ctaBtnText}>
+                START {selected === 'yearly' ? 'YEARLY' : 'MONTHLY'} PLAN
+              </Text>
+            </>
           )}
         </TouchableOpacity>
 
-        <Text style={[styles.legal, { color: colors.textTertiary }]}>
-          Cancel anytime. Subscriptions auto-renew.
+        {/* ── Footer ───────────────────────────────────────────────────────── */}
+        <TouchableOpacity
+          testID="restore-btn"
+          onPress={handleRestore}
+          disabled={isLoading}
+          style={s.restoreBtn}
+          activeOpacity={0.6}
+        >
+          <Text style={[s.restoreText, { color: colors.textTertiary }]}>
+            Restore Purchases
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={[s.legalText, { color: colors.textTertiary }]}>
+          Subscriptions auto-renew unless cancelled at least 24 hours before the end of the billing period.
+          Cancel anytime in your App Store / Play Store account settings.
         </Text>
-      </View>
+
+        <View style={{ height: spacing.xl }} />
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1 },
-  container: { flex: 1, paddingHorizontal: spacing.lg },
-  closeBtn: { alignSelf: 'flex-end', paddingTop: spacing.md },
-  hero: { alignItems: 'center', marginVertical: spacing.lg },
-  heroTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.display, letterSpacing: 2, marginTop: spacing.md },
-  heroSub: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl, letterSpacing: 3, marginTop: -4 },
-  heroDesc: { fontFamily: 'Inter_400Regular', fontSize: fontSize.base, marginTop: spacing.sm },
-  features: { gap: spacing.sm, marginBottom: spacing.lg },
-  featureRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  featureText: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm },
-  plans: { flexDirection: 'row', gap: spacing.sm, marginBottom: spacing.lg },
-  planCard: { flex: 1, padding: spacing.md, borderRadius: radius.lg, borderWidth: 2 },
-  planTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs },
-  planName: { fontFamily: 'Inter_700Bold', fontSize: fontSize.base },
-  saveBadge: { paddingHorizontal: spacing.sm, paddingVertical: 2, borderRadius: radius.sm },
-  saveText: { color: '#fff', fontFamily: 'BarlowCondensed_700Bold', fontSize: 10, letterSpacing: 0.5 },
-  planPrice: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl },
-  planPer: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm },
-  planMonthly: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs, marginTop: 2 },
-  purchaseBtn: { height: 56, borderRadius: radius.lg, justifyContent: 'center', alignItems: 'center', shadowColor: '#FF3B30', shadowOpacity: 0.3, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 6 },
-  purchaseText: { color: '#FFFFFF', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.lg, letterSpacing: 1 },
-  legal: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs, textAlign: 'center', marginTop: spacing.md },
-});
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+function makeStyles(colors: ReturnType<typeof useThemeColors>) {
+  return StyleSheet.create({
+    safe: {
+      flex: 1,
+    },
+    closeBtn: {
+      position: 'absolute',
+      top: spacing.xl + spacing.sm,
+      right: spacing.lg,
+      zIndex: 10,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.surfaceHighlight,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    scroll: {
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.xl,
+    },
+
+    // ── Hero ──────────────────────────────────────────────────────────────────
+    hero: {
+      alignItems: 'center',
+      paddingTop: spacing.xxl,
+      paddingBottom: spacing.xl,
+    },
+    iconRing: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      borderWidth: 1.5,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: spacing.lg,
+    },
+    brandName: {
+      fontFamily: 'BarlowCondensed_700Bold',
+      fontSize: fontSize.display,
+      letterSpacing: 3,
+    },
+    proBadge: {
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs,
+      borderRadius: radius.sm,
+      marginTop: spacing.sm,
+    },
+    proBadgeText: {
+      color: '#fff',
+      fontFamily: 'BarlowCondensed_700Bold',
+      fontSize: fontSize.sm,
+      letterSpacing: 2,
+    },
+    heroTagline: {
+      fontFamily: 'Inter_400Regular',
+      fontSize: fontSize.base,
+      marginTop: spacing.md,
+    },
+
+    // ── Divider ───────────────────────────────────────────────────────────────
+    divider: {
+      height: 1,
+      marginVertical: spacing.xl,
+    },
+
+    // ── Features ──────────────────────────────────────────────────────────────
+    featuresBlock: {
+      gap: spacing.sm,
+    },
+    sectionLabel: {
+      fontFamily: 'Inter_700Bold',
+      fontSize: fontSize.xxs,
+      letterSpacing: 1.2,
+      marginBottom: spacing.sm,
+    },
+    featureRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+    },
+    featureIconWrap: {
+      width: 32,
+      height: 32,
+      borderRadius: radius.md,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    featureText: {
+      fontFamily: 'Inter_400Regular',
+      fontSize: fontSize.sm,
+      flex: 1,
+    },
+
+    // ── Plans ─────────────────────────────────────────────────────────────────
+    plansBlock: {
+      gap: spacing.sm,
+    },
+    planCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: spacing.md,
+      borderRadius: radius.lg,
+      borderWidth: 1.5,
+      gap: spacing.sm,
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    planCardLeft: {
+      flex: 1,
+    },
+    planCardRight: {
+      alignItems: 'flex-end',
+    },
+    planCardTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      flexWrap: 'wrap',
+    },
+    planName: {
+      fontFamily: 'Inter_700Bold',
+      fontSize: fontSize.base,
+    },
+    bestValueBadge: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 2,
+      borderRadius: radius.xs,
+    },
+    bestValueText: {
+      color: '#fff',
+      fontFamily: 'BarlowCondensed_700Bold',
+      fontSize: 9,
+      letterSpacing: 0.8,
+    },
+    planSubtitle: {
+      fontFamily: 'Inter_400Regular',
+      fontSize: fontSize.xs,
+      marginTop: 2,
+    },
+    planPrice: {
+      fontFamily: 'BarlowCondensed_700Bold',
+      fontSize: fontSize.xl,
+    },
+    selectedDot: {
+      position: 'absolute',
+      top: -1,
+      right: -1,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+
+    // ── Preview notice ────────────────────────────────────────────────────────
+    previewNotice: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: spacing.sm,
+      padding: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      marginTop: spacing.sm,
+    },
+    previewText: {
+      fontFamily: 'Inter_400Regular',
+      fontSize: fontSize.xs,
+      flex: 1,
+      lineHeight: 16,
+    },
+
+    // ── CTA ───────────────────────────────────────────────────────────────────
+    ctaBtn: {
+      height: 56,
+      borderRadius: radius.lg,
+      flexDirection: 'row',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginTop: spacing.xl,
+      ...Platform.select({
+        ios: {
+          shadowColor: '#E63935',
+          shadowOpacity: 0.35,
+          shadowRadius: 14,
+          shadowOffset: { width: 0, height: 6 },
+        },
+        android: { elevation: 6 },
+      }),
+    },
+    ctaBtnDisabled: {
+      opacity: 0.7,
+    },
+    ctaBtnText: {
+      color: '#FFFFFF',
+      fontFamily: 'BarlowCondensed_700Bold',
+      fontSize: fontSize.lg,
+      letterSpacing: 1.5,
+    },
+
+    // ── Footer ────────────────────────────────────────────────────────────────
+    restoreBtn: {
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+      marginTop: spacing.sm,
+    },
+    restoreText: {
+      fontFamily: 'Inter_400Regular',
+      fontSize: fontSize.sm,
+      textDecorationLine: 'underline',
+    },
+    legalText: {
+      fontFamily: 'Inter_400Regular',
+      fontSize: fontSize.xs,
+      textAlign: 'center',
+      lineHeight: 16,
+      paddingHorizontal: spacing.sm,
+    },
+  });
+}

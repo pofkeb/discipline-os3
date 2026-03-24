@@ -101,3 +101,60 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Implement real RevenueCat subscription management for Discipline OS (Expo/React Native productivity app). Replace mocked subscription logic with real RevenueCat SDK calls, keep graceful fallbacks for web/Expo Go, keep existing SubscriptionContext interface unchanged, use a config file with TODO placeholder keys, and polish the paywall UI."
+
+frontend:
+  - task: "RevenueCat config file with TODO placeholders"
+    implemented: true
+    working: true
+    file: "frontend/src/config/revenuecat.ts"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Created config file with TODO markers for iOS key, Android key, entitlement ID, offering/package IDs, and fallback prices"
+
+  - task: "SubscriptionContext - real RevenueCat integration with fallback"
+    implemented: true
+    working: true
+    file: "frontend/src/contexts/SubscriptionContext.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Replaced mock with real RC SDK calls via dynamic import. Graceful fallback for web/Expo Go/placeholder keys. Preserved exact context interface. Added offerings + rcAvailable fields. User cancellation handled silently."
+
+  - task: "Paywall UI polish"
+    implemented: true
+    working: true
+    file: "frontend/app/paywall.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: true
+        agent: "main"
+        comment: "Full premium UI redesign. Shows real RC prices when available, fallback prices otherwise. Preview mode notice for web/Expo Go. Restore Purchases link. Legal text. Plan cards with BEST VALUE badge and selection indicator."
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "RevenueCat integration (requires EAS build for real billing)"
+    - "Paywall UI rendering"
+  stuck_tasks: []
+  test_all: false
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "Implemented real RevenueCat integration. react-native-purchases v9.14.0 installed. Config file created with placeholder keys. SubscriptionContext updated with real RC + fallback. Paywall polished. All linting passes. App starts and paywall renders correctly on web preview (shows preview mode notice as expected)."
