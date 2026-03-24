@@ -55,7 +55,10 @@ export type SubscriptionContextType = {
   // ── Existing interface (preserved exactly) ─────────────────────────────────
   plan:             Plan;
   isPro:            boolean;
-  purchasePackage:  (pkg: Package) => Promise<void>;
+  // offeringId: optional named RC offering — pass RC_INTRO_OFFERING_ID /
+  //   RC_PROMO_OFFERING_ID / RC_WINBACK_OFFERING_ID to use a specific offering,
+  //   or omit to use offerings.current (default behaviour).
+  purchasePackage:  (pkg: Package, offeringId?: string) => Promise<void>;
   restorePurchases: () => Promise<boolean>;
   isLoading:        boolean;
   // ── Extended (new – used by paywall for real prices) ───────────────────────
@@ -231,15 +234,21 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
   // ── purchasePackage ───────────────────────────────────────────────────────────
 
-  async function purchasePackage(pkg: Package): Promise<void> {
+  async function purchasePackage(pkg: Package, offeringId?: string): Promise<void> {
     setIsLoading(true);
     try {
       if (rcConfigured && offerings) {
         // ── Real RevenueCat purchase ─────────────────────────────────────────
         const { default: Purchases, PURCHASES_ERROR_CODE } = await import('react-native-purchases');
 
-        const current = offerings.current;
-        if (!current) {
+        // Use the named offering if provided and it exists in the RC catalogue,
+        // otherwise fall back to the current (default) offering.
+        const targetOffering =
+          offeringId && offerings.all?.[offeringId]
+            ? offerings.all[offeringId]
+            : offerings.current;
+
+        if (!targetOffering) {
           throw new Error(
             'No RevenueCat offering found. Check that your offering is configured and set as default in the RevenueCat dashboard.'
           );
@@ -249,13 +258,13 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         let rcPkg: RCPackage | null = null;
         if (pkg === 'yearly') {
           rcPkg =
-            current.annual ??
-            current.availablePackages.find(p => p.identifier === RC_ANNUAL_PACKAGE_ID) ??
+            targetOffering.annual ??
+            targetOffering.availablePackages.find(p => p.identifier === RC_ANNUAL_PACKAGE_ID) ??
             null;
         } else {
           rcPkg =
-            current.monthly ??
-            current.availablePackages.find(p => p.identifier === RC_MONTHLY_PACKAGE_ID) ??
+            targetOffering.monthly ??
+            targetOffering.availablePackages.find(p => p.identifier === RC_MONTHLY_PACKAGE_ID) ??
             null;
         }
 

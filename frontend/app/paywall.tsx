@@ -47,14 +47,22 @@ export default function PaywallScreen() {
   const isRepeatHit = hitCount >= 2;
 
   const contextMessage: string | null =
-    reason === 'goal_limit'     ? 'You\'ve reached the free goal limit'
-    : reason === 'task_limit'   ? 'You\'ve reached the free task limit'
-    : reason === 'reminder_limit' ? 'You\'ve reached the free reminder limit'
+    reason === 'goal_limit'       ? 'You\'ve reached the 1-goal free limit'
+    : reason === 'task_limit'     ? 'You\'ve reached the 10-task free limit'
+    : reason === 'reminder_limit' ? 'You\'ve reached the 3-reminder free limit'
     : null;
 
   const heroTagline = isRepeatHit
     ? 'Remove the limits. Keep building.'
     : 'Unlock your full potential';
+
+  // Second-chance motivation line — shown above plan selector on repeat hits only.
+  // Honest, direct, zero fake urgency.
+  const secondChanceMessage =
+    reason === 'goal_limit'       ? 'Your ambition shouldn\'t have a ceiling. Go unlimited.'
+    : reason === 'task_limit'     ? 'Real systems don\'t stop at 10 tasks. Go unlimited.'
+    : reason === 'reminder_limit' ? 'Build your full routine without a reminder cap.'
+    : 'You\'ve hit the free limit more than once. Remove it for good.';
 
   // ── Derive prices from RC offerings or fallback ────────────────────────────
 
@@ -173,6 +181,16 @@ export default function PaywallScreen() {
         {/* ── Divider ──────────────────────────────────────────────────────── */}
         <View style={[s.divider, { backgroundColor: colors.border }]} />
 
+        {/* ── Second-chance block (repeat hits only) ──────────────────────── */}
+        {isRepeatHit && (
+          <View style={[s.secondChance, { backgroundColor: colors.accent + '08', borderColor: colors.accent + '22' }]}>
+            <Ionicons name="trending-up" size={15} color={colors.accent} />
+            <Text style={[s.secondChanceText, { color: colors.textPrimary }]}>
+              {secondChanceMessage}
+            </Text>
+          </View>
+        )}
+
         {/* ── Plan selector ────────────────────────────────────────────────── */}
         <View style={s.plansBlock}>
           <Text style={[s.sectionLabel, { color: colors.textTertiary }]}>CHOOSE YOUR PLAN</Text>
@@ -271,7 +289,9 @@ export default function PaywallScreen() {
             <>
               <Ionicons name="diamond" size={16} color="#fff" style={{ marginRight: spacing.sm }} />
               <Text style={s.ctaBtnText}>
-                START {selected === 'yearly' ? 'YEARLY' : 'MONTHLY'} PLAN
+                {isRepeatHit
+                  ? 'GET PRO NOW'
+                  : `START ${selected === 'yearly' ? 'YEARLY' : 'MONTHLY'} PLAN`}
               </Text>
             </>
           )}
@@ -367,6 +387,24 @@ function makeStyles(colors: ReturnType<typeof useThemeColors>) {
       fontSize: fontSize.sm,
       marginTop: spacing.md,
       textAlign: 'center',
+    },
+
+    // ── Second-chance block ───────────────────────────────────────────────────
+    secondChance: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.md,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      marginBottom: spacing.lg,
+    },
+    secondChanceText: {
+      fontFamily: 'Inter_500Medium',
+      fontSize: fontSize.sm,
+      flex: 1,
+      lineHeight: 20,
     },
 
     // ── Divider ───────────────────────────────────────────────────────────────
