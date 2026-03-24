@@ -1,4 +1,5 @@
 import * as localStore from './localStore';
+import type { ReminderIntervalType } from './notifications';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
 
@@ -147,7 +148,7 @@ class ApiService {
 
   getReminders() { return localStore.getReminders(); }
 
-  async createReminder(title: string, interval_type: string, interval_value: number, specific_time?: string, note?: string) {
+  async createReminder(title: string, interval_type: ReminderIntervalType, interval_value: number, specific_time?: string, note?: string) {
     const rem = await localStore.createReminder(title, interval_type, interval_value, specific_time, note);
     this.mirrorToBackend('/reminders', { method: 'POST', body: JSON.stringify({ title, note: note || '', interval_type, interval_value, specific_time }) });
     return rem;
@@ -165,7 +166,7 @@ class ApiService {
     return res;
   }
 
-  async updateReminder(id: string, title: string, interval_type: string, interval_value: number, specific_time?: string, note?: string) {
+  async updateReminder(id: string, title: string, interval_type: ReminderIntervalType, interval_value: number, specific_time?: string, note?: string) {
     const rem = await localStore.updateReminder(id, title, interval_type, interval_value, specific_time, note);
     this.mirrorToBackend(`/reminders/${id}`, {
       method: 'PUT',

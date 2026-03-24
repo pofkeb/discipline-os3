@@ -3,6 +3,11 @@ import * as Device from 'expo-device';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+// ─── Shared interval type ────────────────────────────────────────────────────
+// Single source of truth for reminder repeat-type strings.
+// Import this from api.ts, tasks.tsx, and create-reminder.tsx to keep in sync.
+export type ReminderIntervalType = 'minutes' | 'hours' | 'specific';
+
 const NOTIFICATION_IDS_KEY = '@dos/notification_ids';
 
 // Configure how notifications appear when app is foreground
@@ -58,7 +63,7 @@ export async function scheduleReminderNotification(reminder: {
   id: string;
   title: string;
   note?: string;
-  interval_type: string;
+  interval_type: ReminderIntervalType;
   interval_value: number;
   specific_time?: string;
   is_active: boolean;
@@ -168,7 +173,7 @@ export async function syncAllReminderNotifications(reminders: Array<{
   id: string;
   title: string;
   note?: string;
-  interval_type: string;
+  interval_type: ReminderIntervalType;
   interval_value: number;
   specific_time?: string;
   is_active: boolean;

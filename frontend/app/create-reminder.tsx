@@ -8,8 +8,10 @@ import { useSubscription, getLimits } from '../src/contexts/SubscriptionContext'
 import { api } from '../src/services/api';
 import * as Haptics from 'expo-haptics';
 import { requestNotificationPermission, getNotificationPermissionStatus } from '../src/services/notifications';
+import type { ReminderIntervalType } from '../src/services/notifications';
 
-type RepeatType = 'minutes' | 'hours' | 'specific';
+// RepeatType is an alias for the shared ReminderIntervalType — kept as a local name for clarity
+type RepeatType = ReminderIntervalType;
 
 const REPEAT_OPTIONS: { key: RepeatType; label: string; icon: string }[] = [
   { key: 'minutes', label: 'Minutes', icon: 'timer-outline' },

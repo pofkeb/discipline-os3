@@ -5,6 +5,7 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../../src/constants/theme';
 import { api } from '../../src/services/api';
+import type { ReminderIntervalType } from '../../src/services/notifications';
 import * as Haptics from 'expo-haptics';
 
 type Task = {
@@ -17,7 +18,7 @@ type Task = {
   completed_date: string | null;
   created_at: string;
 };
-type Reminder = { id: string; title: string; note?: string; interval_type: string; interval_value: number; specific_time?: string; is_active: boolean };
+type Reminder = { id: string; title: string; note?: string; interval_type: ReminderIntervalType; interval_value: number; specific_time?: string; is_active: boolean };
 
 type TabKey = 'tasks' | 'plan' | 'reminders';
 
