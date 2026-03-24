@@ -144,6 +144,12 @@ class ApiService {
     return res;
   }
 
+  async updateTaskDueDate(id: string, due_date: string | null) {
+    const task = await localStore.updateTaskDueDate(id, due_date);
+    this.mirrorToBackend(`/tasks/${id}`, { method: 'PUT', body: JSON.stringify({ due_date }) });
+    return task;
+  }
+
   // ─── Reminders (always local-first) ───
 
   getReminders() { return localStore.getReminders(); }

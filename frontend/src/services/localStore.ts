@@ -273,6 +273,15 @@ export async function toggleTask(id: string) {
   }
 }
 
+export async function updateTaskDueDate(id: string, due_date: string | null) {
+  const tasks = await getItem<any[]>(KEYS.tasks, []);
+  const idx = tasks.findIndex((t: any) => t.id === id);
+  if (idx === -1) throw new Error('Task not found');
+  tasks[idx] = { ...tasks[idx], due_date };
+  await setItem(KEYS.tasks, tasks);
+  return tasks[idx];
+}
+
 // ─── Reminders ───
 
 import {

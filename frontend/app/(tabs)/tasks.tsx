@@ -481,6 +481,89 @@ export default function TasksScreen() {
     router.push({ pathname: '/create-task', params: { prefillDate: dateStr, prefillType: 'one_time' } } as any);
   };
 
+  // ─── Planner task actions ───
+
+  const movePlanTaskToToday = async (item: Task) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const target = todayStr();
+    await api.updateTaskDueDate(item.id, target);
+    setTasks(prev => prev.map(t => t.id === item.id ? { ...t, due_date: target } : t));
+    // Close the day panel if it becomes empty
+    setSelectedPlanDay(prev => prev);
+  };
+
+  const applyReschedule = async (id: string, newDate: string) => {
+    await api.updateTaskDueDate(id, newDate);
+    setTasks(prev => prev.map(t => t.id === id ? { ...t, due_date: newDate } : t));
+    setSelectedPlanDay(null);
+  };
+
+  const reschedulePlanTask = (item: Task) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    const addDays = (n: number): string => {
+      const d = new Date();
+      d.setDate(d.getDate() + n);
+      return d.toISOString().split('T')[0];
+    };
+    Alert.alert(
+      'Reschedule',
+      item.title,
+      [
+        { text: 'Tomorrow',  onPress: () => applyReschedule(item.id, addDays(1)) },
+        { text: 'In 3 days', onPress: () => applyReschedule(item.id, addDays(3)) },
+        { text: 'Next week', onPress: () => applyReschedule(item.id, addDays(7)) },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
+  };
+
+  const markPlanTaskDone = async (item: Task) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    const res = await api.toggleTask(item.id);
+    setTasks(prev => prev.map(t => {
+      if (t.id !== item.id) return t;
+      return { ...t, is_completed: res.is_completed ?? true, completed_date: res.completed_date ?? todayStr() };
+    }));
+  };
+
+  // ─── Render: planner task with inline actions ───
+
+  const renderPlannerTaskItem = (item: Task) => (
+    <View key={item.id}>
+      {renderOneTime(item, false)}
+      {!item.is_completed && (
+        <View style={[styles.planTaskActions, { borderTopColor: colors.border }]}>
+          <TouchableOpacity
+            onPress={() => movePlanTaskToToday(item)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.planTaskAction}
+          >
+            <Ionicons name="today-outline" size={12} color={colors.accent} />
+            <Text style={[styles.planTaskActionText, { color: colors.accent }]}>Today</Text>
+          </TouchableOpacity>
+          <View style={[styles.planTaskActionSep, { backgroundColor: colors.border }]} />
+          <TouchableOpacity
+            onPress={() => reschedulePlanTask(item)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.planTaskAction}
+          >
+            <Ionicons name="calendar-outline" size={12} color={colors.textSecondary} />
+            <Text style={[styles.planTaskActionText, { color: colors.textSecondary }]}>Reschedule</Text>
+          </TouchableOpacity>
+          <View style={[styles.planTaskActionSep, { backgroundColor: colors.border }]} />
+          <TouchableOpacity
+            onPress={() => markPlanTaskDone(item)}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.planTaskAction}
+          >
+            <Ionicons name="checkmark-circle-outline" size={12} color={colors.success} />
+            <Text style={[styles.planTaskActionText, { color: colors.success }]}>Done</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
   // ─── Planner calendar grid ───
   const planWeeks = getMonthGrid(planYear, planMonth);
   const today = todayStr();
@@ -605,7 +688,7 @@ export default function TasksScreen() {
             </View>
           ) : (
             <View style={styles.planDetailTasks}>
-              {selectedDayTasks.map(t => renderOneTime(t, false))}
+              {selectedDayTasks.map(t => renderPlannerTaskItem(t))}
             </View>
           )}
         </View>
@@ -1215,5 +1298,32 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: fontSize.sm,
     textAlign: 'center',
+  },
+
+  // ─── Planner task action strip ───
+  planTaskActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingVertical: 7,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: -spacing.sm,         // pull flush under the task card
+    marginBottom: spacing.sm,
+  },
+  planTaskAction: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 3,
+  },
+  planTaskActionText: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: fontSize.xxs,
+  },
+  planTaskActionSep: {
+    width: StyleSheet.hairlineWidth,
+    height: 14,
   },
 });
