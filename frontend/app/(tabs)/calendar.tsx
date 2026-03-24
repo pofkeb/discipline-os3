@@ -449,7 +449,7 @@ const s = StyleSheet.create({
 
   pageHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: spacing.md, marginBottom: spacing.lg },
   pageTitle:  { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl, letterSpacing: 1 },
-  streakChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill },
+  streakChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, borderWidth: 1 },
   streakEmoji:{ fontSize: 13 },
   streakTxt:  { fontFamily: 'Inter_600SemiBold', fontSize: fontSize.xs },
 
@@ -468,7 +468,7 @@ const s = StyleSheet.create({
   dayNum:    { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
   missedDot: { width: 4, height: 4, borderRadius: 2, position: 'absolute', bottom: 4 },
 
-  legend:      { flexDirection: 'row', gap: spacing.xl, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 0.5, marginBottom: spacing.xl },
+  legend:      { flexDirection: 'row', gap: spacing.lg, paddingTop: spacing.md, marginTop: spacing.sm, borderTopWidth: 0.5, marginBottom: spacing.xl },
   legendItem:  { flexDirection: 'row', alignItems: 'center', gap: 5 },
   legendCircle:{ width: 10, height: 10, borderRadius: 5 },
   legendDot:   { width: 5, height: 5, borderRadius: 2.5 },

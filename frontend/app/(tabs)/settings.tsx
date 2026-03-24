@@ -203,9 +203,9 @@ export default function SettingsScreen() {
                     <Ionicons name="cloud-upload-outline" size={22} color={colors.accent} />
                   </View>
                   <View style={styles.accountPromptContent}>
-                    <Text style={[styles.accountPromptTitle, { color: colors.textPrimary }]}>Back up your data</Text>
+                    <Text style={[styles.accountPromptTitle, { color: colors.textPrimary }]}>Sync to cloud</Text>
                     <Text style={[styles.accountPromptDesc, { color: colors.textSecondary }]}>
-                      Create an account to sync across devices
+                      Back up and sync your data across devices
                     </Text>
                   </View>
                   <Ionicons name="chevron-forward" size={18} color={colors.textTertiary} />
@@ -327,7 +327,7 @@ export default function SettingsScreen() {
               <View testID="milestones-stat" style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Ionicons name="flag" size={20} color={colors.success} />
                 <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{stats.completed_milestones}</Text>
-                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Roadmap</Text>
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Milestones</Text>
               </View>
             </View>
           )}
@@ -397,7 +397,7 @@ export default function SettingsScreen() {
           )}
 
           {/* Actions Section */}
-          <SectionHeader title="MORE" />
+          <SectionHeader title="GENERAL" />
           <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <SettingRow
               testID="notifications-btn"

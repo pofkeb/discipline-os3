@@ -11,9 +11,9 @@ import * as Haptics from 'expo-haptics';
 type TaskType = 'non_negotiable' | 'negotiable' | 'one_time';
 
 const TYPE_OPTIONS: { key: TaskType; label: string; icon: string; desc: string }[] = [
-  { key: 'non_negotiable', label: 'Non-Negotiable', icon: 'shield-checkmark-outline', desc: 'Must do every day' },
-  { key: 'negotiable',     label: 'Negotiable',     icon: 'repeat-outline',           desc: 'Aim to do daily' },
-  { key: 'one_time',       label: 'One-Time',       icon: 'checkmark-circle-outline', desc: 'Complete once' },
+  { key: 'non_negotiable', label: 'Non-Negotiable', icon: 'shield-checkmark-outline', desc: 'Builds your daily streak' },
+  { key: 'negotiable',     label: 'Negotiable',     icon: 'repeat-outline',           desc: 'Optional — no streak impact' },
+  { key: 'one_time',       label: 'One-Time',       icon: 'checkmark-circle-outline', desc: 'Complete once, with a due date' },
 ];
 
 function todayParts(): { month: string; day: string; year: string } {

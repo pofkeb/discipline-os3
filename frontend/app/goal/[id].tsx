@@ -179,7 +179,7 @@ export default function GoalDetailScreen() {
                 <Text style={[s.progressSub, { color: c.textSecondary }]}>
                   {totalStepCount > 0
                     ? `${doneMs}/${goal.milestones.length} milestones · ${doneSteps}/${totalStepCount} steps`
-                    : 'milestones completed'}
+                    : `${doneMs}/${goal.milestones.length} milestone${goal.milestones.length !== 1 ? 's' : ''} completed`}
                 </Text>
                 {isComplete && <Text style={[s.completeTag, { color: c.success }]}>Goal complete!</Text>}
               </View>

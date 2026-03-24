@@ -420,7 +420,7 @@ export default function TasksScreen() {
       </View>
       <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No tasks yet</Text>
       <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
-        Add daily tasks to build consistent habits.{"\n"}Check them off to build your streak.
+        Add daily tasks to build consistent habits.{"\n"}Non-negotiables drive your streak.
       </Text>
       <TouchableOpacity 
         style={[styles.emptyBtn, { backgroundColor: colors.accent }]} 
@@ -438,7 +438,7 @@ export default function TasksScreen() {
       <View style={[styles.emptyIconWrap, { backgroundColor: colors.accent + '10' }]}>
         <Ionicons name="notifications-outline" size={40} color={colors.accent} />
       </View>
-      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No reminders</Text>
+      <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No reminders yet</Text>
       <Text style={[styles.emptyDesc, { color: colors.textSecondary }]}>
         Set up recurring reminders to stay{"\n"}focused throughout the day.
       </Text>
@@ -761,9 +761,17 @@ export default function TasksScreen() {
             <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
               <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>NEGOTIABLES</Text>
               {negotiables.length > 0 && (
-                <Text style={[styles.progressText, { color: colors.textTertiary }]}>
-                  {doneNeg}/{negotiables.length}
-                </Text>
+                <View style={styles.progressRow}>
+                  <View style={[styles.progressBar, { backgroundColor: colors.surfaceHighlight }]}>
+                    <View style={[styles.progressFill, {
+                      backgroundColor: colors.success,
+                      width: `${(doneNeg / negotiables.length) * 100}%`,
+                    }]} />
+                  </View>
+                  <Text style={[styles.progressText, { color: colors.textSecondary }]}>
+                    {doneNeg}/{negotiables.length}
+                  </Text>
+                </View>
               )}
             </View>
             {negotiables.length === 0 ? (
@@ -785,7 +793,7 @@ export default function TasksScreen() {
             </View>
             {oneTimes.length === 0 ? (
               <View style={[styles.sectionEmpty, { borderColor: colors.border }]}>
-                <Text style={[styles.sectionEmptyText, { color: colors.textTertiary }]}>No one-time tasks yet</Text>
+                <Text style={[styles.sectionEmptyText, { color: colors.textTertiary }]}>No to-dos yet</Text>
               </View>
             ) : (
               oneTimes.map(item => renderOneTime(item))

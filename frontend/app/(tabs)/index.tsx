@@ -349,7 +349,7 @@ export default function HomeScreen() {
                 <Text style={[s.sectionTitle, { color: c.textPrimary }]}>UPCOMING</Text>
               </View>
               <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                <Text style={[s.sectionLink, { color: c.accent }]}>Plan →</Text>
+                <Text style={[s.sectionLink, { color: c.accent }]}>View all →</Text>
               </TouchableOpacity>
             </View>
             <View style={[s.taskList, { backgroundColor: c.surface, borderColor: c.border }]}>
@@ -443,7 +443,7 @@ const s = StyleSheet.create({
   statCard: {
     flex: 1,
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg,
     borderRadius: radius.lg,
     borderWidth: 1,
   },
@@ -519,8 +519,8 @@ const s = StyleSheet.create({
   goalLabel: { fontFamily: 'Inter_600SemiBold', fontSize: fontSize.xxs, letterSpacing: 1 },
   goalName: { fontFamily: 'Inter_600SemiBold', fontSize: fontSize.base, marginBottom: spacing.sm },
   goalProg: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  goalProgBg: { flex: 1, height: 4, borderRadius: 2, overflow: 'hidden' },
-  goalProgFill: { height: '100%', borderRadius: 2, minWidth: 2 },
+  goalProgBg: { flex: 1, height: 5, borderRadius: 2.5, overflow: 'hidden' },
+  goalProgFill: { height: '100%', borderRadius: 2.5, minWidth: 2 },
   goalProgTxt: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs },
 
   emptyHero: {
@@ -566,5 +566,5 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  quickLabel: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xxs },
+  quickLabel: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs },
 });

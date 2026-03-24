@@ -102,7 +102,7 @@
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
 
-user_problem_statement: "Implement real RevenueCat subscription management for Discipline OS (Expo/React Native productivity app). Replace mocked subscription logic with real RevenueCat SDK calls, keep graceful fallbacks for web/Expo Go, keep existing SubscriptionContext interface unchanged, use a config file with TODO placeholder keys, and polish the paywall UI."
+user_problem_statement: "Implement real RevenueCat subscription management for Discipline OS (Expo/React Native productivity app). Replace mocked subscription logic with real RevenueCat SDK calls, keep graceful fallbacks for web/Expo Go, keep existing SubscriptionContext interface unchanged, use a config file with TODO placeholder keys, and polish the paywall UI. Also: micro-polish pass across all main screens."
 
 frontend:
   - task: "RevenueCat config file with TODO placeholders"

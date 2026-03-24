@@ -68,7 +68,7 @@ export default function GoalsScreen() {
             <Text style={[s.goalTitle, { color: c.textPrimary }]} numberOfLines={1}>{item.title}</Text>
             {totalNodes > 0 ? (
               <Text style={[s.goalMeta, { color: c.textTertiary }]}>
-                {doneNodes}/{totalNodes} · {doneMs}/{item.milestones.length} milestones
+                {item.milestones.length} milestone{item.milestones.length !== 1 ? 's' : ''}{allSteps.length > 0 ? ` · ${allSteps.length} step${allSteps.length !== 1 ? 's' : ''}` : ''}
               </Text>
             ) : (
               <Text style={[s.goalMeta, { color: c.textTertiary }]}>No milestones yet</Text>
