@@ -477,7 +477,9 @@ export function getDailyQuote() {
   return QUOTES[dayOfYear % QUOTES.length];
 }
 
-// ─── Templates ───
+export async function getRawCompletions(): Promise<Record<string, string[]>> {
+  return getItem<Record<string, string[]>>(KEYS.completions, {});
+}
 
 export async function createGoalFromTemplate(template: { title: string; description: string; milestones: string[] }) {
   const goals = await getGoals();

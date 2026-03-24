@@ -178,6 +178,7 @@ class ApiService {
 
   getStats() { return localStore.getStats(); }
   getDailyQuote() { return Promise.resolve(localStore.getDailyQuote()); }
+  getCompletions() { return localStore.getRawCompletions(); }
 }
 
 export const api = new ApiService();
