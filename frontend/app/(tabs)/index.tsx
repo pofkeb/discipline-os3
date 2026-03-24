@@ -81,8 +81,6 @@ export default function HomeScreen() {
     hasData,
   } = useMemo(() => {
     const today = todayStr();
-    
-    // Task type classification (migration shim for old 'routine' type)
     const isNonNeg = (type: string | undefined) => {
       const t = type ?? 'routine';
       return t === 'routine' || t === 'non_negotiable';
@@ -90,21 +88,15 @@ export default function HomeScreen() {
     const isNeg = (type: string | undefined) => type === 'negotiable';
     const isOneTime = (type: string | undefined) => (type ?? 'routine') === 'one_time';
 
-    // Split tasks by type
     const nonNegs = tasks.filter(t => isNonNeg(t.type));
     const negs = tasks.filter(t => isNeg(t.type));
     const oneTimes = tasks.filter(t => isOneTime(t.type));
-
-    // Overdue one-time tasks (due before today, not completed)
     const overdue = oneTimes.filter(t => !t.is_completed && t.due_date && t.due_date < today);
-
-    // Upcoming planned one-time tasks (due today or later, not completed)
     const upcoming = oneTimes
       .filter(t => !t.is_completed && t.due_date && t.due_date >= today)
       .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''))
-      .slice(0, 3); // Show max 3
+      .slice(0, 3);
 
-    // Goal progress (first goal)
     const g = goals[0];
     let totalN = 0, doneN = 0;
     if (g) {
@@ -118,8 +110,6 @@ export default function HomeScreen() {
       });
     }
     const percentage = totalN > 0 ? doneN / totalN : 0;
-
-    // Active reminders
     const activeRems = reminders.filter((r: any) => r.is_active);
 
     return {
@@ -143,25 +133,28 @@ export default function HomeScreen() {
 
   if (!ready) return <SafeAreaView style={[s.safe, { backgroundColor: c.background }]} />;
 
-  // ─── Render helpers ───
+  // ─── Render task item ───
 
-  const renderTaskItem = (t: any, type: 'daily' | 'onetime') => {
+  const renderTaskItem = (t: any, type: 'daily' | 'onetime', isLast: boolean) => {
     const isChecked = type === 'onetime' ? t.is_completed : t.is_completed_today;
     const isOver = type === 'onetime' && isOverdue(t.due_date);
     
     return (
       <TouchableOpacity
         key={t.id}
-        style={[s.taskRow, { backgroundColor: c.surface }]}
+        style={[
+          s.taskRow,
+          !isLast && { borderBottomWidth: 1, borderBottomColor: c.border },
+        ]}
         onPress={() => toggle(t.id)}
-        activeOpacity={0.7}
+        activeOpacity={0.6}
       >
         <View style={[
           s.chk,
           type === 'onetime' && s.chkSquare,
           isChecked ? { backgroundColor: c.success, borderColor: c.success } : { borderColor: isOver ? c.error : c.textTertiary },
         ]}>
-          {isChecked && <Ionicons name="checkmark" size={12} color="#fff" />}
+          {isChecked && <Ionicons name="checkmark" size={11} color="#fff" />}
         </View>
         <View style={s.taskContent}>
           <Text
@@ -194,16 +187,16 @@ export default function HomeScreen() {
         {/* ── Header ── */}
         <View style={s.header}>
           <View>
-            <Text style={[s.date, { color: c.textSecondary }]}>{format(new Date(), 'EEEE, MMM d')}</Text>
+            <Text style={[s.date, { color: c.textTertiary }]}>{format(new Date(), 'EEEE, MMM d')}</Text>
             <Text style={[s.brand, { color: c.textPrimary }]}>DISCIPLINE OS</Text>
           </View>
           {streak > 0 && (
             <TouchableOpacity
-              style={[s.streakPill, { backgroundColor: c.accent + '15' }]}
+              style={[s.streakPill, { backgroundColor: c.accent + '12' }]}
               onPress={() => router.push('/(tabs)/calendar')}
               activeOpacity={0.7}
             >
-              <Ionicons name="flame" size={18} color={c.accent} />
+              <Text style={s.streakIcon}>🔥</Text>
               <Text style={[s.streakNum, { color: c.accent }]}>{streak}</Text>
             </TouchableOpacity>
           )}
@@ -212,8 +205,8 @@ export default function HomeScreen() {
         {/* ── Welcome Empty State ── */}
         {!hasData && (
           <View testID="welcome-state" style={[s.emptyHero, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <View style={[s.emptyIconRing, { borderColor: c.accent + '30' }]}>
-              <Ionicons name="flash" size={32} color={c.accent} />
+            <View style={[s.emptyIconRing, { backgroundColor: c.accent + '10' }]}>
+              <Ionicons name="flash" size={28} color={c.accent} />
             </View>
             <Text style={[s.emptyTitle, { color: c.textPrimary }]}>Your journey starts now</Text>
             <Text style={[s.emptyDesc, { color: c.textSecondary }]}>
@@ -224,144 +217,148 @@ export default function HomeScreen() {
               style={[s.emptyBtn, { backgroundColor: c.accent }]}
               onPress={() => router.push('/create-goal')}
             >
-              <Ionicons name="trophy-outline" size={18} color="#fff" />
+              <Ionicons name="trophy-outline" size={16} color="#fff" />
               <Text style={s.emptyBtnTxt}>Set Your First Goal</Text>
             </TouchableOpacity>
           </View>
         )}
 
-        {/* ── Today's Summary Card ── */}
+        {/* ── Summary Stats ── */}
         {hasData && (
-          <View style={[s.summaryCard, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <View style={s.summaryRow}>
-              {/* Non-neg progress */}
-              <View style={s.summaryBlock}>
-                <View style={s.summaryIconRow}>
-                  <Ionicons name="shield-checkmark" size={14} color={allNonNegDone ? c.success : c.accent} />
-                  <Text style={[s.summaryLabel, { color: c.textTertiary }]}>NON-NEG</Text>
-                </View>
-                <Text style={[s.summaryBig, { color: allNonNegDone ? c.success : c.textPrimary }]}>
-                  {doneNonNeg}<Text style={[s.summarySmall, { color: c.textTertiary }]}>/{nonNegotiables.length}</Text>
-                </Text>
+          <View style={[s.statsRow]}>
+            {/* Non-neg stat */}
+            <View style={[s.statCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+              <View style={[s.statIconWrap, { backgroundColor: allNonNegDone ? c.success + '15' : c.accent + '10' }]}>
+                <Ionicons name="shield-checkmark" size={16} color={allNonNegDone ? c.success : c.accent} />
               </View>
-
-              {/* Negotiables progress */}
-              {negotiables.length > 0 && (
-                <View style={s.summaryBlock}>
-                  <View style={s.summaryIconRow}>
-                    <Ionicons name="repeat" size={14} color={c.textTertiary} />
-                    <Text style={[s.summaryLabel, { color: c.textTertiary }]}>FLEX</Text>
-                  </View>
-                  <Text style={[s.summaryBig, { color: c.textPrimary }]}>
-                    {doneNeg}<Text style={[s.summarySmall, { color: c.textTertiary }]}>/{negotiables.length}</Text>
-                  </Text>
-                </View>
-              )}
-
-              {/* Goal progress */}
-              {goal && totalNodes > 0 && (
-                <View style={s.summaryBlock}>
-                  <View style={s.summaryIconRow}>
-                    <Ionicons name="flag" size={14} color={c.accent} />
-                    <Text style={[s.summaryLabel, { color: c.textTertiary }]}>GOAL</Text>
-                  </View>
-                  <Text style={[s.summaryBig, { color: c.textPrimary }]}>
-                    {Math.round(pct * 100)}<Text style={[s.summarySmall, { color: c.textTertiary }]}>%</Text>
-                  </Text>
-                </View>
-              )}
-
-              {/* Overdue count (if any) */}
-              {overdueTasks.length > 0 && (
-                <View style={s.summaryBlock}>
-                  <View style={s.summaryIconRow}>
-                    <Ionicons name="alert-circle" size={14} color={c.error} />
-                    <Text style={[s.summaryLabel, { color: c.error }]}>DUE</Text>
-                  </View>
-                  <Text style={[s.summaryBig, { color: c.error }]}>{overdueTasks.length}</Text>
-                </View>
-              )}
+              <Text style={[s.statValue, { color: allNonNegDone ? c.success : c.textPrimary }]}>
+                {doneNonNeg}/{nonNegotiables.length}
+              </Text>
+              <Text style={[s.statLabel, { color: c.textTertiary }]}>Non-Neg</Text>
             </View>
+
+            {/* Goal progress */}
+            {goal && totalNodes > 0 && (
+              <TouchableOpacity
+                style={[s.statCard, { backgroundColor: c.surface, borderColor: c.border }]}
+                onPress={() => router.push(`/goal/${goal.id}`)}
+                activeOpacity={0.7}
+              >
+                <View style={[s.statIconWrap, { backgroundColor: c.accent + '10' }]}>
+                  <Ionicons name="flag" size={16} color={c.accent} />
+                </View>
+                <Text style={[s.statValue, { color: c.textPrimary }]}>{Math.round(pct * 100)}%</Text>
+                <Text style={[s.statLabel, { color: c.textTertiary }]}>Goal</Text>
+              </TouchableOpacity>
+            )}
+
+            {/* Overdue badge */}
+            {overdueTasks.length > 0 && (
+              <View style={[s.statCard, { backgroundColor: c.error + '08', borderColor: c.error + '30' }]}>
+                <View style={[s.statIconWrap, { backgroundColor: c.error + '15' }]}>
+                  <Ionicons name="alert-circle" size={16} color={c.error} />
+                </View>
+                <Text style={[s.statValue, { color: c.error }]}>{overdueTasks.length}</Text>
+                <Text style={[s.statLabel, { color: c.error }]}>Overdue</Text>
+              </View>
+            )}
+
+            {/* Reminders count */}
+            {activeReminders.length > 0 && !overdueTasks.length && (
+              <TouchableOpacity
+                style={[s.statCard, { backgroundColor: c.surface, borderColor: c.border }]}
+                onPress={() => router.push('/(tabs)/tasks')}
+                activeOpacity={0.7}
+              >
+                <View style={[s.statIconWrap, { backgroundColor: c.accent + '10' }]}>
+                  <Ionicons name="notifications" size={16} color={c.accent} />
+                </View>
+                <Text style={[s.statValue, { color: c.textPrimary }]}>{activeReminders.length}</Text>
+                <Text style={[s.statLabel, { color: c.textTertiary }]}>Reminders</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
         {/* ── Quote ── */}
         {quote && (
-          <View style={[s.quoteCard, { borderLeftColor: c.accent, backgroundColor: c.surface }]}>
-            <Text style={[s.quoteText, { color: c.textPrimary }]}>"{quote.text}"</Text>
-            <Text style={[s.quoteAuthor, { color: c.textTertiary }]}>— {quote.author}</Text>
+          <View style={[s.quoteCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <View style={[s.quoteMark, { backgroundColor: c.accent }]} />
+            <View style={s.quoteContent}>
+              <Text style={[s.quoteText, { color: c.textPrimary }]}>{quote.text}</Text>
+              <Text style={[s.quoteAuthor, { color: c.textTertiary }]}>— {quote.author}</Text>
+            </View>
           </View>
         )}
 
-        {/* ── Non-Negotiables Section ── */}
+        {/* ── Non-Negotiables ── */}
         {nonNegotiables.length > 0 && (
           <View style={s.section}>
             <View style={s.sectionHead}>
               <View style={s.sectionTitleRow}>
-                <Ionicons name="shield-checkmark-outline" size={14} color={c.accent} />
+                <View style={[s.sectionDot, { backgroundColor: allNonNegDone ? c.success : c.accent }]} />
                 <Text style={[s.sectionTitle, { color: c.textPrimary }]}>NON-NEGOTIABLES</Text>
               </View>
               <Text style={[s.sectionCount, { color: allNonNegDone ? c.success : c.textTertiary }]}>
                 {doneNonNeg}/{nonNegotiables.length}
               </Text>
             </View>
-            <View style={[s.taskList, { borderColor: c.border }]}>
-              {nonNegotiables.map(t => renderTaskItem(t, 'daily'))}
+            <View style={[s.taskList, { backgroundColor: c.surface, borderColor: c.border }]}>
+              {nonNegotiables.map((t, i) => renderTaskItem(t, 'daily', i === nonNegotiables.length - 1))}
             </View>
           </View>
         )}
 
-        {/* ── Negotiables Section ── */}
+        {/* ── Negotiables ── */}
         {negotiables.length > 0 && (
           <View style={s.section}>
             <View style={s.sectionHead}>
               <View style={s.sectionTitleRow}>
-                <Ionicons name="repeat-outline" size={14} color={c.textSecondary} />
+                <View style={[s.sectionDot, { backgroundColor: c.textTertiary }]} />
                 <Text style={[s.sectionTitle, { color: c.textPrimary }]}>NEGOTIABLES</Text>
               </View>
               <Text style={[s.sectionCount, { color: c.textTertiary }]}>{doneNeg}/{negotiables.length}</Text>
             </View>
-            <View style={[s.taskList, { borderColor: c.border }]}>
-              {negotiables.map(t => renderTaskItem(t, 'daily'))}
+            <View style={[s.taskList, { backgroundColor: c.surface, borderColor: c.border }]}>
+              {negotiables.map((t, i) => renderTaskItem(t, 'daily', i === negotiables.length - 1))}
             </View>
           </View>
         )}
 
-        {/* ── Overdue Tasks Section ── */}
+        {/* ── Overdue ── */}
         {overdueTasks.length > 0 && (
           <View style={s.section}>
             <View style={s.sectionHead}>
               <View style={s.sectionTitleRow}>
-                <Ionicons name="alert-circle-outline" size={14} color={c.error} />
+                <View style={[s.sectionDot, { backgroundColor: c.error }]} />
                 <Text style={[s.sectionTitle, { color: c.error }]}>OVERDUE</Text>
               </View>
-              <Text style={[s.sectionCount, { color: c.error }]}>{overdueTasks.length}</Text>
             </View>
-            <View style={[s.taskList, { borderColor: c.error + '40' }]}>
-              {overdueTasks.map(t => renderTaskItem(t, 'onetime'))}
+            <View style={[s.taskList, { backgroundColor: c.surface, borderColor: c.error + '30' }]}>
+              {overdueTasks.map((t, i) => renderTaskItem(t, 'onetime', i === overdueTasks.length - 1))}
             </View>
           </View>
         )}
 
-        {/* ── Upcoming Planned Tasks ── */}
+        {/* ── Upcoming ── */}
         {upcomingTasks.length > 0 && (
           <View style={s.section}>
             <View style={s.sectionHead}>
               <View style={s.sectionTitleRow}>
-                <Ionicons name="calendar-outline" size={14} color={c.textSecondary} />
+                <View style={[s.sectionDot, { backgroundColor: c.textTertiary }]} />
                 <Text style={[s.sectionTitle, { color: c.textPrimary }]}>UPCOMING</Text>
               </View>
               <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <Text style={[s.sectionLink, { color: c.accent }]}>Plan →</Text>
               </TouchableOpacity>
             </View>
-            <View style={[s.taskList, { borderColor: c.border }]}>
-              {upcomingTasks.map(t => renderTaskItem(t, 'onetime'))}
+            <View style={[s.taskList, { backgroundColor: c.surface, borderColor: c.border }]}>
+              {upcomingTasks.map((t, i) => renderTaskItem(t, 'onetime', i === upcomingTasks.length - 1))}
             </View>
           </View>
         )}
 
-        {/* ── Current Goal ── */}
+        {/* ── Goal Card ── */}
         {goal && (
           <TouchableOpacity
             testID="active-goal-card"
@@ -380,32 +377,9 @@ export default function HomeScreen() {
                 <View style={[s.goalProgBg, { backgroundColor: c.surfaceHighlight }]}>
                   <View style={[s.goalProgFill, { backgroundColor: c.accent, width: `${pct * 100}%` }]} />
                 </View>
-                <Text style={[s.goalProgTxt, { color: c.textSecondary }]}>{doneNodes}/{totalNodes}</Text>
+                <Text style={[s.goalProgTxt, { color: c.textTertiary }]}>{doneNodes}/{totalNodes}</Text>
               </View>
             )}
-          </TouchableOpacity>
-        )}
-
-        {/* ── Reminders Glance ── */}
-        {activeReminders.length > 0 && (
-          <TouchableOpacity
-            style={[s.remindersCard, { backgroundColor: c.surface, borderColor: c.border }]}
-            onPress={() => router.push('/(tabs)/tasks')}
-            activeOpacity={0.7}
-          >
-            <View style={s.remindersHead}>
-              <Ionicons name="notifications" size={14} color={c.accent} />
-              <Text style={[s.remindersLabel, { color: c.textTertiary }]}>
-                {activeReminders.length} ACTIVE REMINDER{activeReminders.length !== 1 ? 'S' : ''}
-              </Text>
-              <Ionicons name="chevron-forward" size={14} color={c.textTertiary} style={{ marginLeft: 'auto' }} />
-            </View>
-            <Text style={[s.reminderPreview, { color: c.textPrimary }]} numberOfLines={1}>
-              {activeReminders[0].title}
-              {activeReminders.length > 1 && (
-                <Text style={{ color: c.textTertiary }}> +{activeReminders.length - 1} more</Text>
-              )}
-            </Text>
           </TouchableOpacity>
         )}
 
@@ -429,7 +403,7 @@ export default function HomeScreen() {
           ))}
         </View>
 
-        <View style={{ height: 40 }} />
+        <View style={{ height: 32 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -441,7 +415,6 @@ const s = StyleSheet.create({
   safe: { flex: 1 },
   scroll: { paddingHorizontal: spacing.lg },
 
-  // Header
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -449,74 +422,84 @@ const s = StyleSheet.create({
     paddingTop: spacing.md,
     marginBottom: spacing.lg,
   },
-  date: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm },
-  brand: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 28, letterSpacing: 1 },
+  date: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs, letterSpacing: 0.5 },
+  brand: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl, letterSpacing: 1 },
   streakPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
-    borderRadius: 20,
+    borderRadius: radius.pill,
   },
-  streakNum: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xl },
+  streakIcon: { fontSize: 14 },
+  streakNum: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.lg },
 
-  // Summary card
-  summaryCard: {
-    padding: spacing.md,
+  statsRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.lg,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing.md,
     borderRadius: radius.lg,
     borderWidth: 1,
-    marginBottom: spacing.md,
   },
-  summaryRow: { flexDirection: 'row', justifyContent: 'space-around' },
-  summaryBlock: { alignItems: 'center', minWidth: 50 },
-  summaryIconRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 2 },
-  summaryLabel: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 9, letterSpacing: 0.5 },
-  summaryBig: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 28 },
-  summarySmall: { fontSize: 16 },
+  statIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xs,
+  },
+  statValue: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xl },
+  statLabel: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xxs, marginTop: 2 },
 
-  // Quote
   quoteCard: {
-    padding: spacing.md,
-    paddingLeft: spacing.lg,
-    borderRadius: radius.md,
-    borderLeftWidth: 3,
-    marginBottom: spacing.md,
+    flexDirection: 'row',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    overflow: 'hidden',
+    marginBottom: spacing.lg,
   },
-  quoteText: { fontFamily: 'Inter_400Regular', fontSize: 13, lineHeight: 20, fontStyle: 'italic' },
-  quoteAuthor: { fontFamily: 'Inter_500Medium', fontSize: 11, marginTop: 6 },
+  quoteMark: { width: 3 },
+  quoteContent: { flex: 1, padding: spacing.md },
+  quoteText: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, lineHeight: 20, fontStyle: 'italic' },
+  quoteAuthor: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs, marginTop: spacing.sm },
 
-  // Sections
-  section: { marginBottom: spacing.md },
+  section: { marginBottom: spacing.lg },
   sectionHead: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
-  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  sectionTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 13, letterSpacing: 1 },
-  sectionCount: { fontFamily: 'Inter_500Medium', fontSize: 12 },
-  sectionLink: { fontFamily: 'Inter_500Medium', fontSize: 12 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  sectionDot: { width: 6, height: 6, borderRadius: 3 },
+  sectionTitle: { fontFamily: 'Inter_600SemiBold', fontSize: fontSize.xs, letterSpacing: 1 },
+  sectionCount: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs },
+  sectionLink: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs },
 
-  // Task list
   taskList: {
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     borderWidth: 1,
     overflow: 'hidden',
   },
   taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    gap: 12,
+    gap: spacing.md,
   },
   chk: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    borderWidth: 1.5,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -524,57 +507,43 @@ const s = StyleSheet.create({
   taskContent: { flex: 1 },
   taskTxt: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm },
   taskDone: { textDecorationLine: 'line-through' },
-  taskMeta: { fontFamily: 'Inter_400Regular', fontSize: 10, marginTop: 2 },
+  taskMeta: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xxs, marginTop: 2 },
 
-  // Goal card
   goalCard: {
     padding: spacing.md,
     borderRadius: radius.lg,
     borderWidth: 1,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
   goalHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 },
-  goalLabel: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 10, letterSpacing: 1 },
-  goalName: { fontFamily: 'Inter_600SemiBold', fontSize: fontSize.base, marginBottom: 8 },
+  goalLabel: { fontFamily: 'Inter_600SemiBold', fontSize: fontSize.xxs, letterSpacing: 1 },
+  goalName: { fontFamily: 'Inter_600SemiBold', fontSize: fontSize.base, marginBottom: spacing.sm },
   goalProg: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   goalProgBg: { flex: 1, height: 4, borderRadius: 2, overflow: 'hidden' },
   goalProgFill: { height: '100%', borderRadius: 2, minWidth: 2 },
-  goalProgTxt: { fontFamily: 'Inter_500Medium', fontSize: 11 },
+  goalProgTxt: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs },
 
-  // Reminders card
-  remindersCard: {
-    padding: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    marginBottom: spacing.md,
-  },
-  remindersHead: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
-  remindersLabel: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 10, letterSpacing: 1 },
-  reminderPreview: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm },
-
-  // Empty state
   emptyHero: {
     padding: spacing.xl,
     borderRadius: radius.lg,
     borderWidth: 1,
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
     alignItems: 'center',
   },
   emptyIconRing: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    borderWidth: 2,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: spacing.lg,
   },
-  emptyTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl, letterSpacing: 0.5 },
+  emptyTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xl, letterSpacing: 0.5 },
   emptyDesc: {
     fontFamily: 'Inter_400Regular',
     fontSize: fontSize.sm,
     textAlign: 'center',
-    lineHeight: 22,
+    lineHeight: 20,
     marginTop: spacing.sm,
     marginBottom: spacing.lg,
   },
@@ -583,20 +552,19 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.xl,
-    paddingVertical: 14,
+    paddingVertical: spacing.md,
     borderRadius: radius.lg,
   },
-  emptyBtnTxt: { color: '#fff', fontFamily: 'Inter_700Bold', fontSize: fontSize.sm },
+  emptyBtnTxt: { color: '#fff', fontFamily: 'Inter_600SemiBold', fontSize: fontSize.sm },
 
-  // Quick actions
-  quickRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm },
+  quickRow: { flexDirection: 'row', gap: spacing.sm },
   quickBtn: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: spacing.md,
     borderRadius: radius.md,
     borderWidth: 1,
     alignItems: 'center',
     gap: 4,
   },
-  quickLabel: { fontFamily: 'Inter_500Medium', fontSize: 10 },
+  quickLabel: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xxs },
 });

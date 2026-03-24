@@ -459,18 +459,18 @@ const styles = StyleSheet.create({
   content: { paddingHorizontal: spacing.lg },
   header: {
     paddingTop: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
   title: {
     fontFamily: 'BarlowCondensed_700Bold',
     fontSize: fontSize.xxl,
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   sectionHeader: {
     fontFamily: 'Inter_600SemiBold',
-    fontSize: fontSize.xs,
+    fontSize: fontSize.xxs,
     letterSpacing: 1,
-    marginTop: spacing.lg,
+    marginTop: spacing.xl,
     marginBottom: spacing.sm,
     marginLeft: spacing.xs,
   },

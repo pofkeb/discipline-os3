@@ -376,66 +376,66 @@ const s = StyleSheet.create({
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   scroll: { paddingHorizontal: spacing.lg },
 
-  title: { fontFamily: 'BarlowCondensed_700Bold', fontSize: 32, letterSpacing: 0.5, marginBottom: 4 },
-  desc:  { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, lineHeight: 22, marginBottom: spacing.lg },
+  title: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxxl, letterSpacing: 0.5, marginBottom: spacing.xs },
+  desc:  { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, lineHeight: 20, marginBottom: spacing.lg },
 
-  // Progress card (unchanged)
-  progressCard: { padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, marginTop: spacing.md, marginBottom: spacing.xl },
+  // Progress card
+  progressCard: { padding: spacing.lg, borderRadius: radius.lg, borderWidth: 1, marginTop: spacing.sm, marginBottom: spacing.xl },
   progressRow:  { flexDirection: 'row', alignItems: 'center', gap: spacing.lg, marginBottom: spacing.md },
-  ring:         { width: 72, height: 72, borderRadius: 36, borderWidth: 4, justifyContent: 'center', alignItems: 'center' },
-  ringFill:     { width: 60, height: 60, borderRadius: 30, borderWidth: 3, justifyContent: 'center', alignItems: 'center' },
-  ringPct:      { fontFamily: 'BarlowCondensed_700Bold', fontSize: 20 },
+  ring:         { width: 64, height: 64, borderRadius: 32, borderWidth: 3, justifyContent: 'center', alignItems: 'center' },
+  ringFill:     { width: 54, height: 54, borderRadius: 27, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
+  ringPct:      { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.lg },
   progressInfo: { flex: 1 },
-  progressBig:  { fontFamily: 'BarlowCondensed_700Bold', fontSize: 32 },
-  progressSub:  { fontFamily: 'Inter_400Regular', fontSize: 13, marginTop: -2 },
-  completeTag:  { fontFamily: 'Inter_700Bold', fontSize: 13, marginTop: 4 },
+  progressBig:  { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxxl },
+  progressSub:  { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs, marginTop: -2 },
+  completeTag:  { fontFamily: 'Inter_600SemiBold', fontSize: fontSize.xs, marginTop: spacing.xs },
   progBar:      { height: 4, borderRadius: 2, overflow: 'hidden' },
   progFill:     { height: '100%', borderRadius: 2, minWidth: 1 },
 
-  // Roadmap header (unchanged)
+  // Roadmap header
   roadmapHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md },
-  roadmapTitle:  { fontFamily: 'BarlowCondensed_700Bold', fontSize: 16, letterSpacing: 1 },
-  roadmapCount:  { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  roadmapTitle:  { fontFamily: 'Inter_600SemiBold', fontSize: fontSize.xs, letterSpacing: 1 },
+  roadmapCount:  { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs },
 
-  // Empty milestone state (unchanged)
+  // Empty milestone state
   emptyMs:    { borderWidth: 1, borderStyle: 'dashed', borderRadius: radius.lg, padding: spacing.xl, alignItems: 'center', gap: spacing.sm, marginBottom: spacing.md },
   emptyMsTxt: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
 
   // Milestone row
   msRow:      { flexDirection: 'row', marginBottom: 0 },
-  msTimeline: { width: 24, alignItems: 'center', paddingTop: 14 },
-  msDot:      { width: 20, height: 20, borderRadius: 10, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
+  msTimeline: { width: 24, alignItems: 'center', paddingTop: 12 },
+  msDot:      { width: 18, height: 18, borderRadius: 9, justifyContent: 'center', alignItems: 'center', zIndex: 1 },
   msLine:     { width: 2, flex: 1, marginTop: -2, marginBottom: -2 },
   msCardWrap: { flex: 1 },
   msCard:     { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1 },
   msContent:  { flex: 1 },
-  msNum:      { fontFamily: 'Inter_500Medium', fontSize: 10, marginBottom: 2 },
-  msTxt:      { fontFamily: 'Inter_500Medium', fontSize: fontSize.base },
+  msNum:      { fontFamily: 'Inter_500Medium', fontSize: fontSize.xxs, marginBottom: 2 },
+  msTxt:      { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
   msDone:     { textDecorationLine: 'line-through' },
 
-  // Steps block — rendered directly below the milestone card
+  // Steps block
   stepsContainer: { borderWidth: 1, borderTopWidth: 0, borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md, overflow: 'hidden' },
 
   stepRow:  { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, paddingHorizontal: spacing.md, gap: spacing.sm },
   stepDot:  { width: 14, height: 14, borderRadius: 7, borderWidth: 1.5, justifyContent: 'center', alignItems: 'center', flexShrink: 0 },
-  stepTxt:  { fontFamily: 'Inter_400Regular', fontSize: 13, flex: 1 },
+  stepTxt:  { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, flex: 1 },
   stepDone: { textDecorationLine: 'line-through' },
 
   // Inline step input row
   stepAddRow:    { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.sm, paddingVertical: 6, gap: spacing.xs },
-  stepAddInput:  { flex: 1, height: 36, fontFamily: 'Inter_400Regular', fontSize: 13, paddingHorizontal: spacing.sm },
-  stepSaveBtn:   { width: 32, height: 32, borderRadius: radius.sm, justifyContent: 'center', alignItems: 'center' },
-  stepCancelBtn: { width: 32, height: 32, justifyContent: 'center', alignItems: 'center' },
+  stepAddInput:  { flex: 1, height: 34, fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, paddingHorizontal: spacing.sm },
+  stepSaveBtn:   { width: 30, height: 30, borderRadius: radius.sm, justifyContent: 'center', alignItems: 'center' },
+  stepCancelBtn: { width: 30, height: 30, justifyContent: 'center', alignItems: 'center' },
 
-  // Add step button (subtle, sits below the steps block)
+  // Add step button
   addStepBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: spacing.md, borderWidth: 1, borderTopWidth: 0, borderBottomLeftRadius: radius.md, borderBottomRightRadius: radius.md },
-  addStepTxt: { fontFamily: 'Inter_400Regular', fontSize: 12 },
+  addStepTxt: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs },
 
-  // Add milestone input row (unchanged)
-  addRow:   { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, paddingLeft: 36 },
-  addInput: { flex: 1, height: 44, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: fontSize.sm, fontFamily: 'Inter_400Regular', borderWidth: 1 },
-  addBtn:   { width: 44, height: 44, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center' },
-  cancelBtn:{ width: 44, height: 44, justifyContent: 'center', alignItems: 'center' },
-  addMsBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: 14, paddingLeft: 36, borderTopWidth: 1 },
+  // Add milestone input row
+  addRow:   { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.sm, paddingLeft: 32 },
+  addInput: { flex: 1, height: 42, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: fontSize.sm, fontFamily: 'Inter_400Regular', borderWidth: 1 },
+  addBtn:   { width: 42, height: 42, borderRadius: radius.md, justifyContent: 'center', alignItems: 'center' },
+  cancelBtn:{ width: 42, height: 42, justifyContent: 'center', alignItems: 'center' },
+  addMsBtn: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingVertical: spacing.md, paddingLeft: 32, borderTopWidth: 1 },
   addMsTxt: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
 });
