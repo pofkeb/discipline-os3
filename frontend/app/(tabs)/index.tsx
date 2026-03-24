@@ -56,9 +56,11 @@ export default function HomeScreen() {
   const doneToday       = routines.filter(t => t.is_completed_today).length;
   const total           = routines.length;
   const streak          = stats?.streak || 0;
-  const mDone = goal ? goal.milestones.filter((m: any) => m.is_completed).length : 0;
-  const mTotal = goal ? goal.milestones.length : 0;
-  const pct = mTotal > 0 ? mDone / mTotal : 0;
+  const mDone      = goal ? goal.milestones.filter((m: any) => m.is_completed).length : 0;
+  const allGSteps  = goal ? goal.milestones.flatMap((m: any) => m.steps ?? []) : [];
+  const totalNodes = goal ? goal.milestones.length + allGSteps.length : 0;
+  const doneNodes  = mDone + allGSteps.filter((s: any) => s.is_completed).length;
+  const pct        = totalNodes > 0 ? doneNodes / totalNodes : 0;
   const hasData = goals.length > 0 || tasks.length > 0;
   const activeReminders = reminders.filter((r: any) => r.is_active);
 
@@ -90,7 +92,7 @@ export default function HomeScreen() {
                 <Text style={[s.focusBig, { color: total > 0 && doneToday === total ? c.success : c.accent }]}>{doneToday}<Text style={[s.focusSmall, { color: c.textTertiary }]}>/{total}</Text></Text>
                 <Text style={[s.focusStatLabel, { color: c.textSecondary }]}>tasks done</Text>
               </View>
-              {goal && mTotal > 0 && (
+              {goal && totalNodes > 0 && (
                 <View style={s.focusStatBlock}>
                   <Text style={[s.focusBig, { color: c.accent }]}>{Math.round(pct * 100)}<Text style={[s.focusSmall, { color: c.textTertiary }]}>%</Text></Text>
                   <Text style={[s.focusStatLabel, { color: c.textSecondary }]}>goal progress</Text>
@@ -139,12 +141,12 @@ export default function HomeScreen() {
               <Ionicons name="chevron-forward" size={16} color={c.textTertiary} style={{ marginLeft: 'auto' }} />
             </View>
             <Text style={[s.goalName, { color: c.textPrimary }]}>{goal.title}</Text>
-            {mTotal > 0 && (
+            {totalNodes > 0 && (
               <View style={s.goalProg}>
                 <View style={[s.goalProgBg, { backgroundColor: c.surfaceHighlight }]}>
                   <View style={[s.goalProgFill, { backgroundColor: c.accent, width: `${pct * 100}%` }]} />
                 </View>
-                <Text style={[s.goalProgTxt, { color: c.textSecondary }]}>{mDone}/{mTotal}</Text>
+                <Text style={[s.goalProgTxt, { color: c.textSecondary }]}>{doneNodes}/{totalNodes}</Text>
               </View>
             )}
           </TouchableOpacity>

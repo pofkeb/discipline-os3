@@ -7,8 +7,9 @@ import { useThemeColors, spacing, radius, fontSize } from '../../src/constants/t
 import { api } from '../../src/services/api';
 import * as Haptics from 'expo-haptics';
 
-type Milestone = { id: string; title: string; is_completed: boolean };
-type Goal = { id: string; title: string; description: string; milestones: Milestone[]; is_active: boolean };
+type Step      = { id: string; is_completed: boolean };
+type Milestone = { id: string; title: string; is_completed: boolean; steps: Step[] };
+type Goal      = { id: string; title: string; description: string; milestones: Milestone[]; is_active: boolean };
 
 export default function GoalsScreen() {
   const colors = useThemeColors();
@@ -34,9 +35,14 @@ export default function GoalsScreen() {
   };
 
   const renderGoal = ({ item }: { item: Goal }) => {
-    const done = item.milestones.filter(m => m.is_completed).length;
-    const total = item.milestones.length;
-    const progress = total > 0 ? done / total : 0;
+    // Node-based progress: milestones + steps (same formula as goal detail screen)
+    const allSteps   = item.milestones.flatMap(m => m.steps ?? []);
+    const totalNodes = item.milestones.length + allSteps.length;
+    const doneMs     = item.milestones.filter(m => m.is_completed).length;
+    const doneSteps  = allSteps.filter(s => s.is_completed).length;
+    const doneNodes  = doneMs + doneSteps;
+    const progress   = totalNodes > 0 ? doneNodes / totalNodes : 0;
+    const hasSteps   = allSteps.length > 0;
 
     return (
       <TouchableOpacity
@@ -53,15 +59,22 @@ export default function GoalsScreen() {
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
         </View>
-        {total > 0 && (
+        {totalNodes > 0 && (
           <View style={styles.progressSection}>
             <View style={[styles.progressBg, { backgroundColor: colors.surfaceHighlight }]}>
               <View style={[styles.progressFill, { backgroundColor: colors.accent, width: `${progress * 100}%` }]} />
             </View>
-            <Text style={[styles.progressText, { color: colors.textSecondary }]}>{done}/{total} milestones</Text>
+            <Text style={[styles.progressText, { color: colors.textSecondary }]}>
+              {doneNodes}/{totalNodes} done
+            </Text>
+            {hasSteps && (
+              <Text style={[styles.progressSub, { color: colors.textTertiary }]}>
+                {doneMs}/{item.milestones.length} milestones · {doneSteps}/{allSteps.length} steps
+              </Text>
+            )}
           </View>
         )}
-        {total === 0 && (
+        {totalNodes === 0 && (
           <Text style={[styles.noMilestones, { color: colors.textTertiary }]}>Tap to add milestones</Text>
         )}
       </TouchableOpacity>
@@ -119,4 +132,5 @@ const styles = StyleSheet.create({
   progressBg: { height: 6, borderRadius: 3, overflow: 'hidden', marginBottom: spacing.xs },
   progressFill: { height: '100%', borderRadius: 3, minWidth: 2 },
   progressText: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs },
+  progressSub:  { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs, marginTop: 2 },
 });
