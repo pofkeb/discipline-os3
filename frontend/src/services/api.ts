@@ -103,6 +103,24 @@ class ApiService {
     return goal;
   }
 
+  async addStep(goalId: string, milestoneId: string, title: string) {
+    const goal = await localStore.addStep(goalId, milestoneId, title);
+    this.mirrorToBackend(`/goals/${goalId}/milestones/${milestoneId}/steps`, { method: 'POST', body: JSON.stringify({ title }) });
+    return goal;
+  }
+
+  async toggleStep(goalId: string, milestoneId: string, stepId: string) {
+    const goal = await localStore.toggleStep(goalId, milestoneId, stepId);
+    this.mirrorToBackend(`/goals/${goalId}/milestones/${milestoneId}/steps/${stepId}`, { method: 'PUT' });
+    return goal;
+  }
+
+  async deleteStep(goalId: string, milestoneId: string, stepId: string) {
+    const goal = await localStore.deleteStep(goalId, milestoneId, stepId);
+    this.mirrorToBackend(`/goals/${goalId}/milestones/${milestoneId}/steps/${stepId}`, { method: 'DELETE' });
+    return goal;
+  }
+
   // ─── Tasks (always local-first) ───
 
   getTasks() { return localStore.getTasks(); }

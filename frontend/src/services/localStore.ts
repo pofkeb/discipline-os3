@@ -89,6 +89,7 @@ export async function addMilestone(goalId: string, title: string) {
     is_completed: false,
     completed_at: null,
     order: goal.milestones.length,
+    steps: [],
   });
   await setItem(KEYS.goals, goals);
   return { ...goal };
@@ -112,6 +113,52 @@ export async function deleteMilestone(goalId: string, milestoneId: string) {
   const goal = goals.find((g: any) => g.id === goalId);
   if (!goal) throw new Error('Goal not found');
   goal.milestones = goal.milestones.filter((m: any) => m.id !== milestoneId);
+  await setItem(KEYS.goals, goals);
+  return { ...goal };
+}
+
+// ─── Steps (nested under milestones) ───
+
+export async function addStep(goalId: string, milestoneId: string, title: string) {
+  const goals = await getGoals();
+  const goal = goals.find((g: any) => g.id === goalId);
+  if (!goal) throw new Error('Goal not found');
+  const m = goal.milestones.find((m: any) => m.id === milestoneId);
+  if (!m) throw new Error('Milestone not found');
+  if (!m.steps) m.steps = [];
+  m.steps.push({
+    id: generateId(),
+    title,
+    is_completed: false,
+    completed_at: null,
+    order: m.steps.length,
+  });
+  await setItem(KEYS.goals, goals);
+  return { ...goal };
+}
+
+export async function toggleStep(goalId: string, milestoneId: string, stepId: string) {
+  const goals = await getGoals();
+  const goal = goals.find((g: any) => g.id === goalId);
+  if (!goal) throw new Error('Goal not found');
+  const m = goal.milestones.find((m: any) => m.id === milestoneId);
+  if (!m) throw new Error('Milestone not found');
+  const step = (m.steps ?? []).find((s: any) => s.id === stepId);
+  if (step) {
+    step.is_completed = !step.is_completed;
+    step.completed_at = step.is_completed ? new Date().toISOString() : null;
+  }
+  await setItem(KEYS.goals, goals);
+  return { ...goal };
+}
+
+export async function deleteStep(goalId: string, milestoneId: string, stepId: string) {
+  const goals = await getGoals();
+  const goal = goals.find((g: any) => g.id === goalId);
+  if (!goal) throw new Error('Goal not found');
+  const m = goal.milestones.find((m: any) => m.id === milestoneId);
+  if (!m) throw new Error('Milestone not found');
+  m.steps = (m.steps ?? []).filter((s: any) => s.id !== stepId);
   await setItem(KEYS.goals, goals);
   return { ...goal };
 }
