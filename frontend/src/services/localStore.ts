@@ -126,9 +126,15 @@ export async function getTasks(): Promise<any[]> {
   return tasks.map((t: any) => ({ ...t, is_completed_today: todayDone.includes(t.id) }));
 }
 
-export async function createTask(title: string) {
+export async function createTask(title: string, type: 'routine' | 'one_time' = 'routine', due_date: string | null = null) {
   const tasks = await getItem(KEYS.tasks, []);
-  const task = { id: generateId(), title, created_at: new Date().toISOString() };
+  const task = {
+    id: generateId(),
+    title,
+    type,
+    due_date,
+    created_at: new Date().toISOString(),
+  };
   tasks.unshift(task);
   await setItem(KEYS.tasks, tasks);
   return { ...task, is_completed_today: false };
