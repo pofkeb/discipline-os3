@@ -123,7 +123,39 @@ export async function getTasks(): Promise<any[]> {
   const completions = await getItem<Record<string, string[]>>(KEYS.completions, {});
   const today = todayStr();
   const todayDone = completions[today] || [];
-  return tasks.map((t: any) => ({ ...t, is_completed_today: todayDone.includes(t.id) }));
+
+  return tasks.map((t: any) => {
+    const type: 'routine' | 'one_time' = t.type ?? 'routine';
+
+    if (type === 'one_time') {
+      // Scan every date in completion history for this task's ID.
+      // Track the latest date so completed_date is always accurate.
+      let completed_date: string | null = null;
+      for (const [date, ids] of Object.entries(completions)) {
+        if ((ids as string[]).includes(t.id)) {
+          if (!completed_date || date > completed_date) {
+            completed_date = date;
+          }
+        }
+      }
+      return {
+        ...t,
+        type,
+        is_completed_today: false,   // not meaningful for one-time tasks
+        is_completed: completed_date !== null,
+        completed_date,
+      };
+    }
+
+    // routine — daily-reset via today's slice
+    return {
+      ...t,
+      type: 'routine' as const,
+      is_completed_today: todayDone.includes(t.id),
+      is_completed: false,
+      completed_date: null,
+    };
+  });
 }
 
 export async function createTask(title: string, type: 'routine' | 'one_time' = 'routine', due_date: string | null = null) {
@@ -147,17 +179,50 @@ export async function deleteTask(id: string) {
 }
 
 export async function toggleTask(id: string) {
+  // Look up task type first to determine toggle semantics
+  const tasks = await getItem(KEYS.tasks, []);
+  const task = tasks.find((t: any) => t.id === id);
+  const type: 'routine' | 'one_time' = task?.type ?? 'routine';
+
   const completions = await getItem<Record<string, string[]>>(KEYS.completions, {});
   const today = todayStr();
   const todayDone = completions[today] || [];
+
+  if (type === 'one_time') {
+    // Find which date (if any) this task was completed on
+    let completedOnDate: string | null = null;
+    for (const [date, ids] of Object.entries(completions)) {
+      if ((ids as string[]).includes(id)) {
+        completedOnDate = date;
+        break;
+      }
+    }
+
+    if (completedOnDate !== null) {
+      // Un-complete: remove from whatever date it was stored under
+      completions[completedOnDate] = (completions[completedOnDate] as string[]).filter((tid: string) => tid !== id);
+      if ((completions[completedOnDate] as string[]).length === 0) {
+        delete completions[completedOnDate];
+      }
+      await setItem(KEYS.completions, completions);
+      return { is_completed: false, is_completed_today: false, completed_date: null };
+    } else {
+      // Complete: record under today
+      completions[today] = [...todayDone, id];
+      await setItem(KEYS.completions, completions);
+      return { is_completed: true, is_completed_today: false, completed_date: today };
+    }
+  }
+
+  // Routine — unchanged daily-reset behaviour
   if (todayDone.includes(id)) {
     completions[today] = todayDone.filter((tid: string) => tid !== id);
     await setItem(KEYS.completions, completions);
-    return { is_completed: false };
+    return { is_completed_today: false };
   } else {
     completions[today] = [...todayDone, id];
     await setItem(KEYS.completions, completions);
-    return { is_completed: true };
+    return { is_completed_today: true };
   }
 }
 
@@ -263,19 +328,31 @@ export async function getStats() {
   const completions = await getItem<Record<string, string[]>>(KEYS.completions, {});
   const goals = await getItem(KEYS.goals, []);
 
+  // Only routine task IDs count toward streak and weekly chart.
+  // Old tasks with no 'type' field are treated as routines (migration shim).
+  const routineIds = new Set<string>(
+    tasks
+      .filter((t: any) => (t.type ?? 'routine') === 'routine')
+      .map((t: any) => t.id as string)
+  );
+
+  // Streak: consecutive days that have at least one routine completion
   let streak = 0;
   const now = new Date();
   for (let i = 0; i < 365; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const ds = d.toISOString().split('T')[0];
-    if ((completions[ds] || []).length > 0) { streak++; } else { break; }
+    const hasRoutine = (completions[ds] || []).some((cid: string) => routineIds.has(cid));
+    if (hasRoutine) { streak++; } else { break; }
   }
 
+  // Total completions: all task types (historical count)
   let totalCompletions = 0;
   Object.values(completions).forEach((arr: any) => { totalCompletions += arr.length; });
 
-  const todayC = (completions[todayStr()] || []).length;
+  // Today's completions: routine-only (drives the focus card)
+  const todayC = (completions[todayStr()] || []).filter((cid: string) => routineIds.has(cid)).length;
 
   let totalMilestones = 0;
   let completedMilestones = 0;
@@ -291,7 +368,8 @@ export async function getStats() {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const ds = d.toISOString().split('T')[0];
-    weeklyData.push({ date: ds, count: (completions[ds] || []).length });
+    const routineCount = (completions[ds] || []).filter((cid: string) => routineIds.has(cid)).length;
+    weeklyData.push({ date: ds, count: routineCount });
   }
 
   return {

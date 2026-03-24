@@ -32,15 +32,25 @@ export default function HomeScreen() {
   const toggle = async (id: string) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     const res = await api.toggleTask(id);
-    setTasks(p => p.map(t => t.id === id ? { ...t, is_completed_today: res.is_completed } : t));
+    setTasks(p => p.map(t => {
+      if (t.id !== id) return t;
+      if ((t.type ?? 'routine') === 'one_time') {
+        return { ...t, is_completed: res.is_completed ?? false, completed_date: res.completed_date ?? null };
+      }
+      return { ...t, is_completed_today: res.is_completed_today ?? false };
+    }));
   };
 
   if (!ready) return <SafeAreaView style={[s.safe, { backgroundColor: c.background }]} />;
 
   const goal = goals[0];
-  const doneToday = tasks.filter(t => t.is_completed_today).length;
-  const total = tasks.length;
-  const streak = stats?.streak || 0;
+  // Routines: daily check-off progress; one-time incomplete: still show on home
+  const routines        = tasks.filter(t => (t.type ?? 'routine') === 'routine');
+  const incompleteOTs   = tasks.filter(t => (t.type ?? 'routine') === 'one_time' && !t.is_completed);
+  const visibleTasks    = [...routines, ...incompleteOTs];
+  const doneToday       = routines.filter(t => t.is_completed_today).length;
+  const total           = routines.length;
+  const streak          = stats?.streak || 0;
   const mDone = goal ? goal.milestones.filter((m: any) => m.is_completed).length : 0;
   const mTotal = goal ? goal.milestones.length : 0;
   const pct = mTotal > 0 ? mDone / mTotal : 0;
@@ -136,7 +146,7 @@ export default function HomeScreen() {
         )}
 
         {/* Today's Tasks */}
-        {tasks.length > 0 && (
+        {visibleTasks.length > 0 && (
           <View style={s.section}>
             <View style={s.sectionHead}>
               <Text style={[s.sectionTitle, { color: c.textPrimary }]}>TASKS</Text>
@@ -144,16 +154,19 @@ export default function HomeScreen() {
                 <Ionicons name="add-circle" size={22} color={c.accent} />
               </TouchableOpacity>
             </View>
-            {tasks.map(t => (
-              <TouchableOpacity key={t.id} testID={`task-item-${t.id}`}
-                style={[s.taskRow, { borderBottomColor: c.border }]}
-                onPress={() => toggle(t.id)} activeOpacity={0.6}>
-                <View style={[s.chk, t.is_completed_today && { backgroundColor: c.accent, borderColor: c.accent }, !t.is_completed_today && { borderColor: c.textTertiary }]}>
-                  {t.is_completed_today && <Ionicons name="checkmark" size={13} color="#fff" />}
-                </View>
-                <Text style={[s.taskTxt, { color: t.is_completed_today ? c.textTertiary : c.textPrimary }, t.is_completed_today && s.taskDone]}>{t.title}</Text>
-              </TouchableOpacity>
-            ))}
+            {visibleTasks.map(t => {
+              const isChecked = (t.type ?? 'routine') === 'one_time' ? t.is_completed : t.is_completed_today;
+              return (
+                <TouchableOpacity key={t.id} testID={`task-item-${t.id}`}
+                  style={[s.taskRow, { borderBottomColor: c.border }]}
+                  onPress={() => toggle(t.id)} activeOpacity={0.6}>
+                  <View style={[s.chk, isChecked && { backgroundColor: c.accent, borderColor: c.accent }, !isChecked && { borderColor: c.textTertiary }]}>
+                    {isChecked && <Ionicons name="checkmark" size={13} color="#fff" />}
+                  </View>
+                  <Text style={[s.taskTxt, { color: isChecked ? c.textTertiary : c.textPrimary }, isChecked && s.taskDone]}>{t.title}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
