@@ -10,9 +10,9 @@ import * as Haptics from 'expo-haptics';
 type Task = {
   id: string;
   title: string;
-  type: 'routine' | 'one_time';
+  type: 'non_negotiable' | 'negotiable' | 'routine' | 'one_time' | undefined;
   due_date: string | null;
-  is_completed_today: boolean;   // routines: was it done today?
+  is_completed_today: boolean;   // daily tasks: was it done today?
   is_completed: boolean;          // one-time: permanently done?
   completed_date: string | null;  // one-time: date it was marked done
   created_at: string;
@@ -145,16 +145,17 @@ export default function TasksScreen() {
   };
 
   // ─── Derived list splits ───
-  // Migration shim: old 'routine' and missing type both map to non_negotiable.
-  // All three daily types belong in the repeating-tasks section.
-  const isDailyType = (type: string | undefined) => {
-    const t = type ?? 'routine';
-    return t === 'routine' || t === 'non_negotiable' || t === 'negotiable';
-  };
-  const routines  = tasks.filter(t => isDailyType(t.type));
-  const oneTimes  = tasks.filter(t => (t.type ?? 'routine') === 'one_time');
-  const doneToday = routines.filter(t => t.is_completed_today).length;
-  const totalTasks = tasks.length;
+  // Classification shim: old 'routine' and undefined → non_negotiable
+  const nonNegotiables = tasks.filter(t => {
+    const type = t.type ?? 'routine';
+    return type === 'routine' || type === 'non_negotiable';
+  });
+  const negotiables = tasks.filter(t => t.type === 'negotiable');
+  const oneTimes    = tasks.filter(t => (t.type ?? 'routine') === 'one_time');
+
+  const doneNonNeg  = nonNegotiables.filter(t => t.is_completed_today).length;
+  const doneNeg     = negotiables.filter(t => t.is_completed_today).length;
+  const totalTasks  = tasks.length;
   const activeReminders = reminders.filter(r => r.is_active).length;
 
   // ─── Render: routine task item ───
@@ -425,7 +426,9 @@ export default function TasksScreen() {
           </Text>
           <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
             {activeTab === 'tasks'
-              ? (routines.length > 0 ? `${doneToday} of ${routines.length} routines done` : 'Build your routine')
+              ? (nonNegotiables.length > 0
+                  ? `${doneNonNeg} of ${nonNegotiables.length} non-neg done`
+                  : 'Build your daily routine')
               : (reminders.length > 0 ? `${activeReminders} active` : 'Stay on track')
             }
           </Text>
@@ -510,29 +513,46 @@ export default function TasksScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* ── ROUTINES section ── */}
+            {/* ── NON-NEGOTIABLES section ── */}
             <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>ROUTINES</Text>
-              {routines.length > 0 && (
+              <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>NON-NEGOTIABLES</Text>
+              {nonNegotiables.length > 0 && (
                 <View style={styles.progressRow}>
                   <View style={[styles.progressBar, { backgroundColor: colors.surfaceHighlight }]}>
                     <View style={[styles.progressFill, {
                       backgroundColor: colors.success,
-                      width: `${routines.length > 0 ? (doneToday / routines.length) * 100 : 0}%`,
+                      width: `${nonNegotiables.length > 0 ? (doneNonNeg / nonNegotiables.length) * 100 : 0}%`,
                     }]} />
                   </View>
                   <Text style={[styles.progressText, { color: colors.textSecondary }]}>
-                    {doneToday}/{routines.length}
+                    {doneNonNeg}/{nonNegotiables.length}
                   </Text>
                 </View>
               )}
             </View>
-            {routines.length === 0 ? (
+            {nonNegotiables.length === 0 ? (
               <View style={[styles.sectionEmpty, { borderColor: colors.border }]}>
-                <Text style={[styles.sectionEmptyText, { color: colors.textTertiary }]}>No daily routines yet</Text>
+                <Text style={[styles.sectionEmptyText, { color: colors.textTertiary }]}>Add tasks you must do every day</Text>
               </View>
             ) : (
-              routines.map(item => renderRoutine(item))
+              nonNegotiables.map(item => renderRoutine(item))
+            )}
+
+            {/* ── NEGOTIABLES section ── */}
+            <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
+              <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>NEGOTIABLES</Text>
+              {negotiables.length > 0 && (
+                <Text style={[styles.progressText, { color: colors.textTertiary }]}>
+                  {doneNeg}/{negotiables.length}
+                </Text>
+              )}
+            </View>
+            {negotiables.length === 0 ? (
+              <View style={[styles.sectionEmpty, { borderColor: colors.border }]}>
+                <Text style={[styles.sectionEmptyText, { color: colors.textTertiary }]}>Add flexible daily tasks here</Text>
+              </View>
+            ) : (
+              negotiables.map(item => renderRoutine(item))
             )}
 
             {/* ── TO-DO section ── */}
