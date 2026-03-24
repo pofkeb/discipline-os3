@@ -11,25 +11,15 @@ import { requestNotificationPermission, getNotificationPermissionStatus } from '
 
 type RepeatType = 'minutes' | 'hours' | 'specific';
 
-const REPEAT_OPTIONS: { key: RepeatType; label: string; icon: string; desc: string }[] = [
-  { key: 'minutes', label: 'Minutes', icon: 'timer-outline', desc: 'Repeat every X minutes' },
-  { key: 'hours', label: 'Hours', icon: 'time-outline', desc: 'Repeat every X hours' },
-  { key: 'specific', label: 'Time', icon: 'alarm-outline', desc: 'Daily at a specific time' },
+const REPEAT_OPTIONS: { key: RepeatType; label: string; icon: string }[] = [
+  { key: 'minutes', label: 'Minutes', icon: 'timer-outline' },
+  { key: 'hours',   label: 'Hours',   icon: 'time-outline' },
+  { key: 'specific', label: 'Time',   icon: 'alarm-outline' },
 ];
 
-const QUICK_INTERVALS: Record<string, { label: string; value: number }[]> = {
-  minutes: [
-    { label: '15', value: 15 },
-    { label: '30', value: 30 },
-    { label: '45', value: 45 },
-    { label: '60', value: 60 },
-  ],
-  hours: [
-    { label: '1', value: 1 },
-    { label: '2', value: 2 },
-    { label: '4', value: 4 },
-    { label: '8', value: 8 },
-  ],
+const QUICK_INTERVALS: Record<string, number[]> = {
+  minutes: [15, 30, 45, 60],
+  hours: [1, 2, 4, 8],
 };
 
 function formatNextDue(type: RepeatType, value: number, specificTime?: string): string {
@@ -51,7 +41,7 @@ function formatNextDue(type: RepeatType, value: number, specificTime?: string): 
 }
 
 export default function CreateReminderScreen() {
-  const colors = useThemeColors();
+  const c = useThemeColors();
   const router = useRouter();
   const { id: editId } = useLocalSearchParams<{ id?: string }>();
   const isEditing = !!editId;
@@ -65,24 +55,18 @@ export default function CreateReminderScreen() {
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(isEditing);
 
-  // When editing, pre-fill all fields with the existing reminder data
   useEffect(() => {
     if (!isEditing) return;
     api.getReminders().then((reminders: any[]) => {
       const rem = reminders.find((r: any) => r.id === editId);
-      if (!rem) {
-        Alert.alert('Error', 'Reminder not found');
-        router.back();
-        return;
-      }
+      if (!rem) { Alert.alert('Error', 'Reminder not found'); router.back(); return; }
       setTitle(rem.title);
       setNote(rem.note ?? '');
       setRepeatType(rem.interval_type as RepeatType);
       setIntervalValue(String(rem.interval_value));
       if (rem.interval_type === 'specific' && rem.specific_time) {
         const [h, m] = rem.specific_time.split(':');
-        setHour(h);
-        setMinute(m);
+        setHour(h); setMinute(m);
       }
     }).finally(() => setInitializing(false));
   }, [editId]);
@@ -91,38 +75,24 @@ export default function CreateReminderScreen() {
   const preview = formatNextDue(repeatType, parseInt(intervalValue) || 1, specificTime);
 
   const handleCreate = async () => {
-    if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a reminder title');
-      return;
-    }
-
-    // Only check the count limit when creating, not when editing
+    if (!title.trim()) { Alert.alert('Error', 'Please enter a reminder title'); return; }
     if (!isEditing) {
       const reminders = await api.getReminders();
       const limits = getLimits(plan);
       if (reminders.length >= limits.maxReminders) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-        router.push('/paywall');
-        return;
+        router.push('/paywall'); return;
       }
     }
-    
-    // Request notification permission if not already granted
     const permStatus = await getNotificationPermissionStatus();
     if (permStatus !== 'granted') {
       const granted = await requestNotificationPermission();
       if (!granted) {
-        // Still create/update the reminder, but warn user
-        Alert.alert(
-          'Notifications Disabled',
-          isEditing
-            ? 'Your reminder was updated but notifications are disabled. Enable them in Settings to receive alerts.'
-            : 'Your reminder was saved but notifications are disabled. Enable them in Settings to receive alerts.',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Notifications Disabled', isEditing
+          ? 'Your reminder was updated but notifications are disabled.'
+          : 'Your reminder was saved but notifications are disabled.', [{ text: 'OK' }]);
       }
     }
-    
     setLoading(true);
     try {
       const time = repeatType === 'specific' ? specificTime : undefined;
@@ -135,9 +105,7 @@ export default function CreateReminderScreen() {
       router.back();
     } catch (e: any) {
       Alert.alert('Error', e.message || (isEditing ? 'Failed to update reminder' : 'Failed to create reminder'));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const selectQuickInterval = (val: number) => {
@@ -146,213 +114,303 @@ export default function CreateReminderScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
+    <SafeAreaView style={[s.safe, { backgroundColor: c.background }]}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={s.flex}>
         {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity testID="close-create-reminder-btn" onPress={() => router.back()}>
-            <Ionicons name="close" size={28} color={colors.textPrimary} />
+        <View style={s.header}>
+          <TouchableOpacity testID="close-create-reminder-btn" onPress={() => router.back()} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+            <Ionicons name="close" size={24} color={c.textPrimary} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            {isEditing ? 'EDIT REMINDER' : 'NEW REMINDER'}
-          </Text>
-          <View style={{ width: 28 }} />
+          <Text style={[s.headerTitle, { color: c.textPrimary }]}>{isEditing ? 'Edit Reminder' : 'New Reminder'}</Text>
+          <View style={{ width: 24 }} />
         </View>
 
         {initializing ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={colors.accent} />
-          </View>
+          <View style={s.center}><ActivityIndicator size="large" color={c.accent} /></View>
         ) : (
-          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          {/* Title */}
-          <Text style={[styles.label, { color: colors.textSecondary }]}>TITLE</Text>
-          <TextInput
-            testID="reminder-title-input"
-            style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary }]}
-            placeholder="e.g. Drink water, Stand up, Deep breaths"
-            placeholderTextColor={colors.textTertiary}
-            value={title}
-            onChangeText={setTitle}
-            autoFocus
-          />
+          <ScrollView contentContainerStyle={s.scroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            {/* Title */}
+            <Text style={[s.label, { color: c.textTertiary }]}>TITLE</Text>
+            <TextInput
+              testID="reminder-title-input"
+              style={[s.input, { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary }]}
+              placeholder="e.g. Drink water"
+              placeholderTextColor={c.textTertiary}
+              value={title}
+              onChangeText={setTitle}
+              autoFocus
+            />
 
-          {/* Note */}
-          <Text style={[styles.label, { color: colors.textSecondary }]}>NOTE (OPTIONAL)</Text>
-          <TextInput
-            testID="reminder-note-input"
-            style={[styles.noteInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary }]}
-            placeholder="Add context or instructions..."
-            placeholderTextColor={colors.textTertiary}
-            value={note}
-            onChangeText={setNote}
-            multiline
-            numberOfLines={3}
-            textAlignVertical="top"
-          />
+            {/* Note */}
+            <Text style={[s.label, { color: c.textTertiary }]}>NOTE <Text style={{ fontFamily: 'Inter_400Regular' }}>(optional)</Text></Text>
+            <TextInput
+              testID="reminder-note-input"
+              style={[s.noteInput, { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary }]}
+              placeholder="Add context..."
+              placeholderTextColor={c.textTertiary}
+              value={note}
+              onChangeText={setNote}
+              multiline
+              numberOfLines={2}
+              textAlignVertical="top"
+            />
 
-          {/* Repeat Type */}
-          <Text style={[styles.label, { color: colors.textSecondary }]}>REPEAT</Text>
-          <View style={styles.repeatGrid}>
-            {REPEAT_OPTIONS.map(opt => (
-              <TouchableOpacity
-                key={opt.key}
-                testID={`repeat-type-${opt.key}-btn`}
-                style={[
-                  styles.repeatCard,
-                  { backgroundColor: colors.surface, borderColor: repeatType === opt.key ? colors.accent : colors.border },
-                  repeatType === opt.key && { borderWidth: 2 },
-                ]}
-                onPress={() => { Haptics.selectionAsync(); setRepeatType(opt.key); }}
-                activeOpacity={0.7}
-              >
-                <Ionicons name={opt.icon as any} size={22} color={repeatType === opt.key ? colors.accent : colors.textSecondary} />
-                <Text style={[styles.repeatLabel, { color: repeatType === opt.key ? colors.accent : colors.textPrimary }]}>{opt.label}</Text>
-                <Text style={[styles.repeatDesc, { color: colors.textTertiary }]}>{opt.desc}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {/* Interval Config */}
-          {repeatType !== 'specific' ? (
-            <View style={styles.intervalSection}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>EVERY</Text>
-              <View style={styles.intervalRow}>
-                <TextInput
-                  testID="interval-value-input"
-                  style={[styles.intervalInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary }]}
-                  value={intervalValue}
-                  onChangeText={setIntervalValue}
-                  keyboardType="number-pad"
-                  maxLength={3}
-                />
-                <Text style={[styles.intervalUnit, { color: colors.textSecondary }]}>{repeatType}</Text>
-              </View>
-              {QUICK_INTERVALS[repeatType] && (
-                <View style={styles.quickRow}>
-                  {QUICK_INTERVALS[repeatType].map(q => (
-                    <TouchableOpacity
-                      key={q.value}
-                      testID={`quick-${q.value}-btn`}
-                      style={[
-                        styles.quickChip,
-                        { borderColor: colors.border },
-                        intervalValue === String(q.value) && { backgroundColor: colors.accent, borderColor: colors.accent },
-                      ]}
-                      onPress={() => selectQuickInterval(q.value)}
-                    >
-                      <Text style={[styles.quickChipText, { color: intervalValue === String(q.value) ? '#fff' : colors.textSecondary }]}>{q.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
+            {/* Repeat type */}
+            <Text style={[s.label, { color: c.textTertiary }]}>REPEAT</Text>
+            <View style={s.repeatRow}>
+              {REPEAT_OPTIONS.map(opt => {
+                const active = repeatType === opt.key;
+                return (
+                  <TouchableOpacity
+                    key={opt.key}
+                    testID={`repeat-type-${opt.key}-btn`}
+                    style={[
+                      s.repeatChip,
+                      { backgroundColor: active ? c.accent : c.surface, borderColor: active ? c.accent : c.border },
+                    ]}
+                    onPress={() => { Haptics.selectionAsync(); setRepeatType(opt.key); }}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons name={opt.icon as any} size={16} color={active ? '#fff' : c.textSecondary} />
+                    <Text style={[s.repeatChipText, { color: active ? '#fff' : c.textPrimary }]}>{opt.label}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          ) : (
-            <View style={styles.intervalSection}>
-              <Text style={[styles.label, { color: colors.textSecondary }]}>TIME</Text>
-              <View style={styles.timeRow}>
-                <View style={styles.timeInputWrap}>
+
+            {/* Interval config */}
+            {repeatType !== 'specific' ? (
+              <>
+                <Text style={[s.label, { color: c.textTertiary }]}>EVERY</Text>
+                <View style={s.intervalRow}>
                   <TextInput
-                    testID="time-hour-input"
-                    style={[styles.timeInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary }]}
-                    value={hour}
-                    onChangeText={t => { const n = t.replace(/\D/g, ''); if (n.length <= 2 && Number(n) <= 23) setHour(n); }}
+                    testID="interval-value-input"
+                    style={[s.intervalInput, { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary }]}
+                    value={intervalValue}
+                    onChangeText={setIntervalValue}
                     keyboardType="number-pad"
-                    maxLength={2}
-                    placeholder="09"
-                    placeholderTextColor={colors.textTertiary}
+                    maxLength={3}
                   />
-                  <Text style={[styles.timeLabel, { color: colors.textTertiary }]}>HH</Text>
+                  <Text style={[s.intervalUnit, { color: c.textSecondary }]}>{repeatType}</Text>
                 </View>
-                <Text style={[styles.timeSep, { color: colors.textPrimary }]}>:</Text>
-                <View style={styles.timeInputWrap}>
-                  <TextInput
-                    testID="time-minute-input"
-                    style={[styles.timeInput, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.textPrimary }]}
-                    value={minute}
-                    onChangeText={t => { const n = t.replace(/\D/g, ''); if (n.length <= 2 && Number(n) <= 59) setMinute(n); }}
-                    keyboardType="number-pad"
-                    maxLength={2}
-                    placeholder="00"
-                    placeholderTextColor={colors.textTertiary}
-                  />
-                  <Text style={[styles.timeLabel, { color: colors.textTertiary }]}>MM</Text>
+                {QUICK_INTERVALS[repeatType] && (
+                  <View style={s.quickRow}>
+                    {QUICK_INTERVALS[repeatType].map(val => (
+                      <TouchableOpacity
+                        key={val}
+                        testID={`quick-${val}-btn`}
+                        style={[
+                          s.quickChip,
+                          { backgroundColor: intervalValue === String(val) ? c.accent : c.surface, borderColor: intervalValue === String(val) ? c.accent : c.border },
+                        ]}
+                        onPress={() => selectQuickInterval(val)}
+                      >
+                        <Text style={[s.quickChipText, { color: intervalValue === String(val) ? '#fff' : c.textSecondary }]}>{val}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+              </>
+            ) : (
+              <>
+                <Text style={[s.label, { color: c.textTertiary }]}>TIME</Text>
+                <View style={s.timeRow}>
+                  <View style={s.timeCol}>
+                    <TextInput
+                      testID="time-hour-input"
+                      style={[s.timeInput, { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary }]}
+                      value={hour}
+                      onChangeText={t => { const n = t.replace(/\D/g, ''); if (n.length <= 2 && Number(n) <= 23) setHour(n); }}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      placeholder="09"
+                      placeholderTextColor={c.textTertiary}
+                    />
+                    <Text style={[s.timeHint, { color: c.textTertiary }]}>Hour</Text>
+                  </View>
+                  <Text style={[s.timeSep, { color: c.textPrimary }]}>:</Text>
+                  <View style={s.timeCol}>
+                    <TextInput
+                      testID="time-minute-input"
+                      style={[s.timeInput, { backgroundColor: c.surface, borderColor: c.border, color: c.textPrimary }]}
+                      value={minute}
+                      onChangeText={t => { const n = t.replace(/\D/g, ''); if (n.length <= 2 && Number(n) <= 59) setMinute(n); }}
+                      keyboardType="number-pad"
+                      maxLength={2}
+                      placeholder="00"
+                      placeholderTextColor={c.textTertiary}
+                    />
+                    <Text style={[s.timeHint, { color: c.textTertiary }]}>Minute</Text>
+                  </View>
+                </View>
+              </>
+            )}
+
+            {/* Preview */}
+            {title.trim() !== '' && (
+              <View testID="reminder-preview" style={[s.previewCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+                <View style={[s.previewIcon, { backgroundColor: c.accent + '12' }]}>
+                  <Ionicons name="notifications" size={16} color={c.accent} />
+                </View>
+                <View style={s.previewContent}>
+                  <Text style={[s.previewTitle, { color: c.textPrimary }]} numberOfLines={1}>{title.trim()}</Text>
+                  <Text style={[s.previewSub, { color: c.textTertiary }]}>
+                    {repeatType === 'specific' ? `Daily at ${specificTime}` : `Every ${intervalValue} ${repeatType}`}
+                    {preview ? ` · ${preview}` : ''}
+                  </Text>
                 </View>
               </View>
-            </View>
-          )}
+            )}
 
-          {/* Preview */}
-          {title.trim() !== '' && (
-            <View testID="reminder-preview" style={[styles.previewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Ionicons name="notifications" size={18} color={colors.accent} />
-              <View style={styles.previewContent}>
-                <Text style={[styles.previewTitle, { color: colors.textPrimary }]}>{title.trim()}</Text>
-                <Text style={[styles.previewSub, { color: colors.textSecondary }]}>
-                  {repeatType === 'specific'
-                    ? `Daily at ${specificTime}`
-                    : `Every ${intervalValue} ${repeatType}`}
-                  {preview ? `  ·  ${preview}` : ''}
-                </Text>
-              </View>
-            </View>
-          )}
+            <View style={{ height: spacing.xxl }} />
+          </ScrollView>
+        )}
 
-          {/* Create / Update Button */}
+        {/* CTA */}
+        <View style={s.ctaWrap}>
           <TouchableOpacity
             testID="save-reminder-btn"
-            style={[styles.button, { backgroundColor: colors.accent }]}
+            style={[s.button, { backgroundColor: title.trim() ? c.accent : c.border }]}
             onPress={handleCreate}
-            disabled={loading}
-            activeOpacity={0.8}
+            disabled={loading || !title.trim()}
+            activeOpacity={0.85}
           >
             {loading ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.buttonText}>
-                {isEditing ? 'UPDATE REMINDER' : 'ADD REMINDER'}
-              </Text>
+              <Text style={s.buttonText}>{isEditing ? 'UPDATE REMINDER' : 'ADD REMINDER'}</Text>
             )}
           </TouchableOpacity>
-
-          <View style={{ height: spacing.xxl }} />
-        </ScrollView>
-        )}
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
-  headerTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xl, letterSpacing: 1 },
-  scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-  label: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xs, letterSpacing: 1, marginTop: spacing.lg, marginBottom: spacing.sm },
-  input: { height: 56, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: fontSize.base, fontFamily: 'Inter_400Regular', borderWidth: 1 },
-  noteInput: { height: 80, borderRadius: radius.md, padding: spacing.md, fontSize: fontSize.sm, fontFamily: 'Inter_400Regular', borderWidth: 1 },
-  repeatGrid: { flexDirection: 'row', gap: spacing.sm },
-  repeatCard: { flex: 1, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', gap: spacing.xs },
-  repeatLabel: { fontFamily: 'Inter_700Bold', fontSize: fontSize.sm },
-  repeatDesc: { fontFamily: 'Inter_400Regular', fontSize: 10, textAlign: 'center' },
-  intervalSection: { marginTop: spacing.sm },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+  headerTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.lg, letterSpacing: 1 },
+  scroll: { paddingHorizontal: spacing.lg },
+  label: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.xxs,
+    letterSpacing: 1,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  input: {
+    height: 52,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    fontSize: fontSize.base,
+    fontFamily: 'Inter_400Regular',
+    borderWidth: 1,
+  },
+  noteInput: {
+    height: 72,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    fontSize: fontSize.sm,
+    fontFamily: 'Inter_400Regular',
+    borderWidth: 1,
+  },
+
+  // Repeat type chips
+  repeatRow: { flexDirection: 'row', gap: spacing.sm },
+  repeatChip: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+  },
+  repeatChipText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
+
+  // Interval
   intervalRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  intervalInput: { width: 80, height: 56, borderRadius: radius.md, borderWidth: 1, textAlign: 'center', fontSize: fontSize.xxl, fontFamily: 'BarlowCondensed_700Bold' },
-  intervalUnit: { fontFamily: 'Inter_500Medium', fontSize: fontSize.lg },
+  intervalInput: {
+    width: 72,
+    height: 52,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    textAlign: 'center',
+    fontSize: fontSize.xl,
+    fontFamily: 'BarlowCondensed_700Bold',
+  },
+  intervalUnit: { fontFamily: 'Inter_500Medium', fontSize: fontSize.base },
   quickRow: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.md },
-  quickChip: { paddingHorizontal: spacing.lg, paddingVertical: spacing.sm, borderRadius: radius.pill, borderWidth: 1 },
+  quickChip: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
   quickChipText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
-  timeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  timeInputWrap: { alignItems: 'center' },
-  timeInput: { width: 72, height: 64, borderRadius: radius.md, borderWidth: 1, textAlign: 'center', fontSize: fontSize.xxxl, fontFamily: 'BarlowCondensed_700Bold' },
-  timeLabel: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs, marginTop: 4 },
-  timeSep: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxxl, marginBottom: spacing.lg },
-  previewCard: { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.md, borderWidth: 1, marginTop: spacing.lg, gap: spacing.md },
+
+  // Time inputs
+  timeRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  timeCol: { alignItems: 'center' },
+  timeInput: {
+    width: 64,
+    height: 56,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    textAlign: 'center',
+    fontSize: fontSize.xxl,
+    fontFamily: 'BarlowCondensed_700Bold',
+  },
+  timeHint: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xxs, marginTop: 4 },
+  timeSep: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxl, paddingTop: 12 },
+
+  // Preview
+  previewCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginTop: spacing.xl,
+    gap: spacing.md,
+  },
+  previewIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   previewContent: { flex: 1 },
   previewTitle: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
   previewSub: { fontFamily: 'Inter_400Regular', fontSize: fontSize.xs, marginTop: 2 },
-  button: { height: 56, borderRadius: radius.lg, justifyContent: 'center', alignItems: 'center', marginTop: spacing.xl },
-  buttonText: { color: '#FFFFFF', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.lg, letterSpacing: 1 },
+
+  // CTA
+  ctaWrap: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.xxl,
+  },
+  button: {
+    height: 52,
+    borderRadius: radius.lg,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#fff',
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.base,
+    letterSpacing: 1.5,
+  },
 });
