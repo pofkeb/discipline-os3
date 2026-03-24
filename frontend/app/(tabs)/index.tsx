@@ -79,6 +79,7 @@ export default function HomeScreen() {
     activeReminders,
     streak,
     hasData,
+    dailyScore,
   } = useMemo(() => {
     const today = todayStr();
     const isNonNeg = (type: string | undefined) => {
@@ -112,6 +113,24 @@ export default function HomeScreen() {
     const percentage = totalN > 0 ? doneN / totalN : 0;
     const activeRems = reminders.filter((r: any) => r.is_active);
 
+    // ─── Daily Score ─────────────────────────────────────────────────────────
+    // Weights: non-negs 65 · negotiables 25 · roadmap 10 · overdue −5/task (max −25)
+    // Normalise against the weights that actually exist so the score is always 0–100
+    const nnTotal  = nonNegs.length;
+    const negTotal = negs.length;
+    const nnDone   = nonNegs.filter((t: any) => t.is_completed_today).length;
+    const negDone  = negs.filter((t: any) => t.is_completed_today).length;
+
+    const maxPts    = (nnTotal  > 0 ? 65 : 0) + (negTotal > 0 ? 25 : 0) + (totalN > 0 ? 10 : 0);
+    const earnedPts =
+      (nnTotal  > 0 ? (nnDone  / nnTotal)  * 65 : 0) +
+      (negTotal > 0 ? (negDone / negTotal)  * 25 : 0) +
+      (totalN   > 0 ? percentage            * 10 : 0);
+    const overduePenalty = Math.min(overdue.length * 5, 25);
+    const dailyScore = maxPts > 0
+      ? Math.round(Math.max(0, Math.min(100, (earnedPts / maxPts) * 100 - overduePenalty)))
+      : 0;
+
     return {
       nonNegotiables: nonNegs,
       negotiables: negs,
@@ -124,12 +143,23 @@ export default function HomeScreen() {
       activeReminders: activeRems,
       streak: stats?.streak || 0,
       hasData: goals.length > 0 || tasks.length > 0,
+      dailyScore,
     };
   }, [tasks, goals, reminders, stats]);
 
   const doneNonNeg = nonNegotiables.filter(t => t.is_completed_today).length;
   const doneNeg = negotiables.filter(t => t.is_completed_today).length;
   const allNonNegDone = nonNegotiables.length > 0 && doneNonNeg === nonNegotiables.length;
+
+  // ─── Score presentation ───
+  const showScore = nonNegotiables.length > 0 || negotiables.length > 0;
+  const scoreLabel =
+    dailyScore >= 85 ? 'Locked in' :
+    dailyScore >= 65 ? 'Strong'    :
+    dailyScore >= 40 ? 'Solid'     : 'Off track';
+  const scoreColor =
+    dailyScore >= 80 ? c.success :
+    dailyScore >= 50 ? c.accent  : '#E67E22';
 
   if (!ready) return <SafeAreaView style={[s.safe, { backgroundColor: c.background }]} />;
 
@@ -221,6 +251,32 @@ export default function HomeScreen() {
               <Text style={s.emptyBtnTxt}>Set Your First Goal</Text>
             </TouchableOpacity>
           </View>
+        )}
+
+        {/* ── Daily Score ── */}
+        {hasData && showScore && (
+          <TouchableOpacity
+            style={[s.scoreCard, { backgroundColor: c.surface, borderColor: scoreColor + '28' }]}
+            onPress={() => router.push('/(tabs)/calendar')}
+            activeOpacity={0.75}
+          >
+            <View style={s.scoreLeft}>
+              <Text style={[s.scoreNum, { color: scoreColor }]}>{dailyScore}</Text>
+              <Text style={[s.scoreDay, { color: c.textTertiary }]}>TODAY</Text>
+            </View>
+            <View style={s.scoreRight}>
+              <View style={[s.scoreBarBg, { backgroundColor: c.surfaceHighlight }]}>
+                <View style={[s.scoreBarFill, {
+                  backgroundColor: scoreColor,
+                  width: `${dailyScore}%`,
+                  minWidth: dailyScore > 0 ? 4 : 0,
+                }]} />
+              </View>
+              <View style={[s.scoreLabelPill, { backgroundColor: scoreColor + '14' }]}>
+                <Text style={[s.scoreLabelTxt, { color: scoreColor }]}>{scoreLabel}</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
         )}
 
         {/* ── Summary Stats ── */}
@@ -567,4 +623,55 @@ const s = StyleSheet.create({
     gap: 4,
   },
   quickLabel: { fontFamily: 'Inter_500Medium', fontSize: fontSize.xs },
+
+  // ─── Daily Score card ───
+  scoreCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+    gap: spacing.lg,
+  },
+  scoreLeft: {
+    alignItems: 'center',
+    minWidth: 44,
+  },
+  scoreNum: {
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.display,
+    lineHeight: fontSize.display,
+  },
+  scoreDay: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: fontSize.xxs,
+    letterSpacing: 1,
+    marginTop: 2,
+  },
+  scoreRight: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  scoreBarBg: {
+    height: 6,
+    borderRadius: 3,
+    overflow: 'hidden',
+  },
+  scoreBarFill: {
+    height: '100%',
+    borderRadius: 3,
+  },
+  scoreLabelPill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  scoreLabelTxt: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.xs,
+    letterSpacing: 0.4,
+  },
 });
