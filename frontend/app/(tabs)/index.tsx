@@ -12,6 +12,12 @@ import { format } from 'date-fns';
 
 const todayStr = (): string => new Date().toISOString().split('T')[0];
 
+const tomorrowStr = (): string => {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split('T')[0];
+};
+
 const formatDueLabel = (due_date: string | null): string => {
   if (!due_date) return '';
   const today = todayStr();
@@ -80,6 +86,7 @@ export default function HomeScreen() {
     streak,
     hasData,
     dailyScore,
+    tomorrowTasks,
   } = useMemo(() => {
     const today = todayStr();
     const isNonNeg = (type: string | undefined) => {
@@ -97,6 +104,8 @@ export default function HomeScreen() {
       .filter(t => !t.is_completed && t.due_date && t.due_date >= today)
       .sort((a, b) => (a.due_date || '').localeCompare(b.due_date || ''))
       .slice(0, 3);
+    const tmrw = tomorrowStr();
+    const tomorrowTasks = oneTimes.filter(t => !t.is_completed && t.due_date === tmrw);
 
     const g = goals[0];
     let totalN = 0, doneN = 0;
@@ -144,6 +153,7 @@ export default function HomeScreen() {
       streak: stats?.streak || 0,
       hasData: goals.length > 0 || tasks.length > 0,
       dailyScore,
+      tomorrowTasks,
     };
   }, [tasks, goals, reminders, stats]);
 
@@ -160,6 +170,11 @@ export default function HomeScreen() {
   const scoreColor =
     dailyScore >= 80 ? c.success :
     dailyScore >= 50 ? c.accent  : '#E67E22';
+
+  // ─── Evening Review ───
+  const missedNonNegs = nonNegotiables.filter((t: any) => !t.is_completed_today);
+  const totalDoneToday = doneNonNeg + doneNeg;
+  const showEveningReview = showScore && new Date().getHours() >= 15;
 
   if (!ready) return <SafeAreaView style={[s.safe, { backgroundColor: c.background }]} />;
 
@@ -439,6 +454,103 @@ export default function HomeScreen() {
           </TouchableOpacity>
         )}
 
+        {/* ── Evening Review ── */}
+        {showEveningReview && (
+          <View style={[s.reviewCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+
+            {/* Header */}
+            <View style={s.reviewHeader}>
+              <Text style={[s.reviewTitle, { color: c.textTertiary }]}>EVENING REVIEW</Text>
+              <View style={[s.reviewScorePill, { backgroundColor: scoreColor + '14' }]}>
+                <Text style={[s.reviewScoreText, { color: scoreColor }]}>{dailyScore} · {scoreLabel}</Text>
+              </View>
+            </View>
+
+            {/* Summary counts */}
+            <View style={[s.reviewSummary, { borderTopColor: c.border }]}>
+              <View style={s.reviewSumStat}>
+                <Text style={[s.reviewSumNum, { color: totalDoneToday === nonNegotiables.length + negotiables.length && totalDoneToday > 0 ? c.success : c.textPrimary }]}>
+                  {totalDoneToday}
+                </Text>
+                <Text style={[s.reviewSumLabel, { color: c.textTertiary }]}>
+                  of {nonNegotiables.length + negotiables.length} done
+                </Text>
+              </View>
+              {missedNonNegs.length > 0 && (
+                <>
+                  <View style={[s.reviewSumSep, { backgroundColor: c.border }]} />
+                  <View style={s.reviewSumStat}>
+                    <Text style={[s.reviewSumNum, { color: c.error }]}>{missedNonNegs.length}</Text>
+                    <Text style={[s.reviewSumLabel, { color: c.textTertiary }]}>missed</Text>
+                  </View>
+                </>
+              )}
+              {overdueTasks.length > 0 && (
+                <>
+                  <View style={[s.reviewSumSep, { backgroundColor: c.border }]} />
+                  <View style={s.reviewSumStat}>
+                    <Text style={[s.reviewSumNum, { color: '#E67E22' }]}>{overdueTasks.length}</Text>
+                    <Text style={[s.reviewSumLabel, { color: c.textTertiary }]}>overdue</Text>
+                  </View>
+                </>
+              )}
+            </View>
+
+            {/* Missed non-negotiables */}
+            {missedNonNegs.length > 0 && (
+              <View style={[s.reviewBlock, { borderTopColor: c.border }]}>
+                <Text style={[s.reviewBlockLabel, { color: c.textTertiary }]}>MISSED</Text>
+                {missedNonNegs.slice(0, 3).map((t: any) => (
+                  <View key={t.id} style={s.reviewRow}>
+                    <View style={[s.reviewDot, { backgroundColor: c.error + '50' }]} />
+                    <Text style={[s.reviewRowText, { color: c.textSecondary }]} numberOfLines={1}>
+                      {t.title}
+                    </Text>
+                  </View>
+                ))}
+                {missedNonNegs.length > 3 && (
+                  <Text style={[s.reviewMore, { color: c.textTertiary }]}>
+                    +{missedNonNegs.length - 3} more
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {/* Tomorrow's plan */}
+            <View style={[s.reviewBlock, { borderTopColor: c.border }]}>
+              <Text style={[s.reviewBlockLabel, { color: c.textTertiary }]}>TOMORROW</Text>
+              {tomorrowTasks.length === 0 ? (
+                <TouchableOpacity
+                  onPress={() => router.push('/(tabs)/tasks')}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text style={[s.reviewEmptyLink, { color: c.accent }]}>
+                    Nothing planned — open Planner →
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <>
+                  {tomorrowTasks.slice(0, 3).map((t: any) => (
+                    <View key={t.id} style={s.reviewRow}>
+                      <View style={[s.reviewDot, { backgroundColor: c.textTertiary + '80' }]} />
+                      <Text style={[s.reviewRowText, { color: c.textSecondary }]} numberOfLines={1}>
+                        {t.title}
+                      </Text>
+                    </View>
+                  ))}
+                  {tomorrowTasks.length > 3 && (
+                    <Text style={[s.reviewMore, { color: c.textTertiary }]}>
+                      +{tomorrowTasks.length - 3} more
+                    </Text>
+                  )}
+                </>
+              )}
+            </View>
+
+          </View>
+        )}
+
         {/* ── Quick Actions ── */}
         <View style={s.quickRow}>
           {[
@@ -673,5 +785,99 @@ const s = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: fontSize.xs,
     letterSpacing: 0.4,
+  },
+
+  // ─── Evening Review card ───
+  reviewCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginBottom: spacing.lg,
+    overflow: 'hidden',
+  },
+  reviewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  reviewTitle: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.xxs,
+    letterSpacing: 1,
+  },
+  reviewScorePill: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  reviewScoreText: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.xs,
+  },
+  reviewSummary: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.xl,
+    borderTopWidth: 1,
+  },
+  reviewSumStat: {
+    alignItems: 'center',
+    gap: 2,
+  },
+  reviewSumNum: {
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.xl,
+    lineHeight: fontSize.xl,
+  },
+  reviewSumLabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.xxs,
+  },
+  reviewSumSep: {
+    width: 1,
+    height: 28,
+    alignSelf: 'center',
+  },
+  reviewBlock: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
+    borderTopWidth: 1,
+    gap: spacing.xs,
+  },
+  reviewBlockLabel: {
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: fontSize.xxs,
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  reviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: 3,
+  },
+  reviewDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    flexShrink: 0,
+  },
+  reviewRowText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.sm,
+    flex: 1,
+  },
+  reviewEmptyLink: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: fontSize.sm,
+  },
+  reviewMore: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.xs,
+    marginTop: 2,
   },
 });
