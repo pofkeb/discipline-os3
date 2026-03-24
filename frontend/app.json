@@ -5,16 +5,21 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "disciplineos",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.yourcompany.disciplineos",
       "infoPlist": {
         "NSUserNotificationsUsageDescription": "Receive reminders to stay on track with your goals"
       }
     },
     "android": {
+      "package": "com.yourcompany.disciplineos",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
@@ -36,7 +41,7 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#000"
@@ -48,7 +53,7 @@
           "icon": "./assets/images/icon.png",
           "color": "#FF3B30"
         }
-      ],
+      ]
     ],
     "experiments": {
       "typedRoutes": true
