@@ -27,10 +27,8 @@ const FEATURES = [
   { icon: 'trophy-outline',           text: 'Unlimited goals & milestones' },
   { icon: 'checkmark-done-outline',   text: 'Unlimited daily tasks' },
   { icon: 'notifications-outline',    text: 'Unlimited reminders' },
-  { icon: 'bar-chart-outline',        text: 'Advanced stats & analytics' },
-  { icon: 'calendar-outline',         text: 'Full history & calendar access' },
-  { icon: 'bulb-outline',             text: 'Premium motivational content' },
-  { icon: 'phone-portrait-outline',   text: 'Future widget support' },
+  { icon: 'bar-chart-outline',        text: 'Progress stats & streak tracking' },
+  { icon: 'calendar-outline',         text: 'Full history & calendar view' },
 ];
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
