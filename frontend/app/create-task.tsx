@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../src/constants/theme';
 import { useSubscription, getLimits } from '../src/contexts/SubscriptionContext';
@@ -25,6 +25,11 @@ function todayParts(): { month: string; day: string; year: string } {
   };
 }
 
+function dateParts(dateStr: string): { month: string; day: string; year: string } {
+  const [year, month, day] = dateStr.split('-');
+  return { month, day, year };
+}
+
 function buildDueDate(month: string, day: string, year: string): string {
   return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
@@ -46,15 +51,24 @@ export default function CreateTaskScreen() {
   const colors = useThemeColors();
   const router = useRouter();
   const { plan } = useSubscription();
+  
+  // Get prefill params from Planner (if any)
+  const params = useLocalSearchParams<{ prefillDate?: string; prefillType?: string }>();
+  const prefillDate = params.prefillDate;
+  const prefillType = params.prefillType as TaskType | undefined;
+  
+  // Initialize state based on prefill params
+  const initialDate = prefillDate ? dateParts(prefillDate) : todayParts();
+  const initialType: TaskType = prefillType || 'non_negotiable';
+  
   const [title, setTitle] = useState('');
-  const [taskType, setTaskType] = useState<TaskType>('non_negotiable');
+  const [taskType, setTaskType] = useState<TaskType>(initialType);
   const [loading, setLoading] = useState(false);
 
-  // Date state — pre-filled with today, only used when taskType === 'one_time'
-  const today = todayParts();
-  const [dueMonth, setDueMonth] = useState(today.month);
-  const [dueDay,   setDueDay]   = useState(today.day);
-  const [dueYear,  setDueYear]  = useState(today.year);
+  // Date state — pre-filled from params or today
+  const [dueMonth, setDueMonth] = useState(initialDate.month);
+  const [dueDay,   setDueDay]   = useState(initialDate.day);
+  const [dueYear,  setDueYear]  = useState(initialDate.year);
 
   const dueDateStr  = buildDueDate(dueMonth, dueDay, dueYear);
   const datePreview = formatDueDatePreview(dueMonth, dueDay, dueYear);

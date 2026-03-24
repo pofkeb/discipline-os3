@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ScrollView, ActivityIndicator, Alert, Switch, Animated, Pressable } from 'react-native';
+import { useState, useCallback, useRef, useMemo } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, FlatList, ScrollView, ActivityIndicator, Alert, Switch, Animated, Pressable, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -12,21 +12,49 @@ type Task = {
   title: string;
   type: 'non_negotiable' | 'negotiable' | 'routine' | 'one_time' | undefined;
   due_date: string | null;
-  is_completed_today: boolean;   // daily tasks: was it done today?
-  is_completed: boolean;          // one-time: permanently done?
-  completed_date: string | null;  // one-time: date it was marked done
+  is_completed_today: boolean;
+  is_completed: boolean;
+  completed_date: string | null;
   created_at: string;
 };
 type Reminder = { id: string; title: string; note?: string; interval_type: string; interval_value: number; specific_time?: string; is_active: boolean };
 
+type TabKey = 'tasks' | 'plan' | 'reminders';
+
+// ─── Date helpers ───
+const todayStr = (): string => new Date().toISOString().split('T')[0];
+
+const toDateStr = (year: number, month: number, day: number): string =>
+  `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+const getMonthGrid = (year: number, month: number): (number | null)[][] => {
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const firstDay = new Date(year, month, 1).getDay();
+  const cells: (number | null)[] = Array(firstDay).fill(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return weeks;
+};
+
+const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
 export default function TasksScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { width: screenWidth } = useWindowDimensions();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'tasks' | 'reminders'>('tasks');
-  const tabIndicatorAnim = useRef(new Animated.Value(0)).current;
+  const [activeTab, setActiveTab] = useState<TabKey>('tasks');
+
+  // Planner state
+  const now = new Date();
+  const [planYear, setPlanYear] = useState(now.getFullYear());
+  const [planMonth, setPlanMonth] = useState(now.getMonth());
+  const [selectedPlanDay, setSelectedPlanDay] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -38,15 +66,9 @@ export default function TasksScreen() {
 
   useFocusEffect(useCallback(() => { loadData(); }, [loadData]));
 
-  const switchTab = (tab: 'tasks' | 'reminders') => {
+  const switchTab = (tab: TabKey) => {
     Haptics.selectionAsync();
     setActiveTab(tab);
-    Animated.spring(tabIndicatorAnim, {
-      toValue: tab === 'tasks' ? 0 : 1,
-      useNativeDriver: true,
-      tension: 300,
-      friction: 20,
-    }).start();
   };
 
   const toggleTask = async (taskId: string) => {
@@ -113,10 +135,6 @@ export default function TasksScreen() {
     return `Every ${item.interval_value} ${item.interval_type}`;
   };
 
-  // ─── Date helpers ───
-
-  const todayStr = (): string => new Date().toISOString().split('T')[0];
-
   const isOverdue = (due_date: string | null): boolean => {
     if (!due_date) return false;
     return due_date < todayStr();
@@ -145,18 +163,37 @@ export default function TasksScreen() {
   };
 
   // ─── Derived list splits ───
-  // Classification shim: old 'routine' and undefined → non_negotiable
   const nonNegotiables = tasks.filter(t => {
     const type = t.type ?? 'routine';
     return type === 'routine' || type === 'non_negotiable';
   });
   const negotiables = tasks.filter(t => t.type === 'negotiable');
-  const oneTimes    = tasks.filter(t => (t.type ?? 'routine') === 'one_time');
+  const oneTimes = tasks.filter(t => (t.type ?? 'routine') === 'one_time');
 
-  const doneNonNeg  = nonNegotiables.filter(t => t.is_completed_today).length;
-  const doneNeg     = negotiables.filter(t => t.is_completed_today).length;
-  const totalTasks  = tasks.length;
+  const doneNonNeg = nonNegotiables.filter(t => t.is_completed_today).length;
+  const doneNeg = negotiables.filter(t => t.is_completed_today).length;
+  const totalTasks = tasks.length;
   const activeReminders = reminders.filter(r => r.is_active).length;
+
+  // ─── Planner: tasks grouped by future due_date ───
+  const futureTasks = useMemo(() => {
+    const today = todayStr();
+    return oneTimes.filter(t => !t.is_completed && t.due_date && t.due_date >= today);
+  }, [oneTimes]);
+
+  const tasksByDate = useMemo(() => {
+    const map: Record<string, Task[]> = {};
+    futureTasks.forEach(t => {
+      if (t.due_date) {
+        if (!map[t.due_date]) map[t.due_date] = [];
+        map[t.due_date].push(t);
+      }
+    });
+    return map;
+  }, [futureTasks]);
+
+  // ─── Planner: selected day tasks ───
+  const selectedDayTasks = selectedPlanDay ? (tasksByDate[selectedPlanDay] || []) : [];
 
   // ─── Render: routine task item ───
   const renderRoutine = (item: Task) => (
@@ -201,12 +238,11 @@ export default function TasksScreen() {
   );
 
   // ─── Render: one-time task item ───
-  const renderOneTime = (item: Task) => {
-    const overdue   = !item.is_completed && isOverdue(item.due_date);
-    const dueLabel  = formatDueLabel(item.due_date);
+  const renderOneTime = (item: Task, showDue = true) => {
+    const overdue = !item.is_completed && isOverdue(item.due_date);
+    const dueLabel = formatDueLabel(item.due_date);
     const doneLabel = formatCompletedDate(item.completed_date);
 
-    // Due badge color
     let dueBgColor = colors.surfaceHighlight;
     let dueTextColor = colors.textTertiary;
     if (item.is_completed) {
@@ -266,7 +302,7 @@ export default function TasksScreen() {
             {item.is_completed ? (
               <Text style={[styles.taskDoneLabel, { color: colors.success }]}>{doneLabel}</Text>
             ) : (
-              item.due_date && (
+              showDue && item.due_date && (
                 <View style={[styles.duePill, { backgroundColor: dueBgColor }]}>
                   <Ionicons
                     name={overdue ? 'alert-circle-outline' : 'calendar-outline'}
@@ -416,89 +452,271 @@ export default function TasksScreen() {
     </View>
   );
 
+  // ─── Planner month navigation ───
+  const prevPlanMonth = () => {
+    Haptics.selectionAsync();
+    const today = new Date();
+    // Can't go before current month
+    if (planYear === today.getFullYear() && planMonth <= today.getMonth()) return;
+    if (planMonth === 0) { setPlanYear(y => y - 1); setPlanMonth(11); }
+    else setPlanMonth(m => m - 1);
+    setSelectedPlanDay(null);
+  };
+
+  const nextPlanMonth = () => {
+    Haptics.selectionAsync();
+    if (planMonth === 11) { setPlanYear(y => y + 1); setPlanMonth(0); }
+    else setPlanMonth(m => m + 1);
+    setSelectedPlanDay(null);
+  };
+
+  const selectPlanDay = (ds: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSelectedPlanDay(ds === selectedPlanDay ? null : ds);
+  };
+
+  const createTaskForDay = (dateStr: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({ pathname: '/create-task', params: { prefillDate: dateStr, prefillType: 'one_time' } } as any);
+  };
+
+  // ─── Planner calendar grid ───
+  const planWeeks = getMonthGrid(planYear, planMonth);
+  const today = todayStr();
+  const cellSize = Math.floor((screenWidth - spacing.lg * 2) / 7);
+  const canGoPrevMonth = !(planYear === now.getFullYear() && planMonth <= now.getMonth());
+
+  // ─── Render Planner ───
+  const renderPlanner = () => (
+    <ScrollView contentContainerStyle={styles.plannerScroll} showsVerticalScrollIndicator={false}>
+      {/* Month navigation */}
+      <View style={styles.planMonthNav}>
+        <TouchableOpacity
+          onPress={prevPlanMonth}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          style={{ opacity: canGoPrevMonth ? 1 : 0.25 }}
+        >
+          <Ionicons name="chevron-back" size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
+        <View style={styles.planMonthCenter}>
+          <Text style={[styles.planMonthName, { color: colors.textPrimary }]}>
+            {MONTH_NAMES[planMonth].toUpperCase()} {planYear}
+          </Text>
+          <Text style={[styles.planMonthSub, { color: colors.textTertiary }]}>
+            {futureTasks.length} task{futureTasks.length !== 1 ? 's' : ''} planned
+          </Text>
+        </View>
+        <TouchableOpacity onPress={nextPlanMonth} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Ionicons name="chevron-forward" size={22} color={colors.textPrimary} />
+        </TouchableOpacity>
+      </View>
+
+      {/* Day labels */}
+      <View style={styles.planDowRow}>
+        {DAY_LABELS.map((l, i) => (
+          <View key={i} style={[styles.planCell, { width: cellSize }]}>
+            <Text style={[styles.planDowLabel, { color: colors.textTertiary }]}>{l}</Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Calendar grid */}
+      {planWeeks.map((week, wi) => (
+        <View key={wi} style={styles.planWeek}>
+          {week.map((day, di) => {
+            if (!day) return <View key={di} style={[styles.planCell, { width: cellSize }]} />;
+            const ds = toDateStr(planYear, planMonth, day);
+            const isPast = ds < today;
+            const isToday = ds === today;
+            const isSel = ds === selectedPlanDay;
+            const tasksOnDay = tasksByDate[ds] || [];
+            const hasTask = tasksOnDay.length > 0;
+
+            let circleBg = 'transparent';
+            if (hasTask && !isPast) circleBg = colors.accent;
+
+            let numColor = colors.textPrimary;
+            if (isPast) numColor = colors.textTertiary;
+            if (hasTask && !isPast) numColor = '#fff';
+
+            return (
+              <TouchableOpacity
+                key={di}
+                style={[styles.planCell, { width: cellSize }]}
+                onPress={() => !isPast && selectPlanDay(ds)}
+                onLongPress={() => !isPast && createTaskForDay(ds)}
+                activeOpacity={isPast ? 1 : 0.7}
+                disabled={isPast}
+              >
+                <View style={[
+                  styles.planDayCircle,
+                  { backgroundColor: circleBg },
+                  isToday && !isSel && { borderWidth: 2, borderColor: colors.accent },
+                  isSel && { borderWidth: 2, borderColor: colors.textSecondary },
+                ]}>
+                  <Text style={[styles.planDayNum, { color: numColor }]}>{day}</Text>
+                </View>
+                {/* Task count badge */}
+                {hasTask && !isPast && tasksOnDay.length > 1 && (
+                  <View style={[styles.planBadge, { backgroundColor: colors.surface }]}>
+                    <Text style={[styles.planBadgeText, { color: colors.accent }]}>{tasksOnDay.length}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ))}
+
+      {/* Legend */}
+      <View style={[styles.planLegend, { borderTopColor: colors.border }]}>
+        <View style={styles.planLegendItem}>
+          <View style={[styles.planLegendCircle, { backgroundColor: colors.accent }]} />
+          <Text style={[styles.planLegendLabel, { color: colors.textTertiary }]}>Planned</Text>
+        </View>
+        <Text style={[styles.planLegendTip, { color: colors.textTertiary }]}>
+          Long-press a day to plan
+        </Text>
+      </View>
+
+      {/* Selected day detail */}
+      {selectedPlanDay && (
+        <View style={[styles.planDetail, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.planDetailHeader}>
+            <Text style={[styles.planDetailDate, { color: colors.textTertiary }]}>
+              {new Date(selectedPlanDay + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }).toUpperCase()}
+            </Text>
+            <TouchableOpacity
+              style={[styles.planDetailAddBtn, { backgroundColor: colors.accent }]}
+              onPress={() => createTaskForDay(selectedPlanDay)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="add" size={16} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {selectedDayTasks.length === 0 ? (
+            <View style={styles.planDetailEmpty}>
+              <Ionicons name="calendar-outline" size={20} color={colors.textTertiary} />
+              <Text style={[styles.planDetailEmptyText, { color: colors.textTertiary }]}>
+                No tasks planned
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.planDetailTasks}>
+              {selectedDayTasks.map(t => renderOneTime(t, false))}
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* Empty state when no future tasks */}
+      {futureTasks.length === 0 && !selectedPlanDay && (
+        <View style={[styles.planEmptyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Ionicons name="calendar-outline" size={32} color={colors.textTertiary} />
+          <Text style={[styles.planEmptyTitle, { color: colors.textPrimary }]}>No upcoming tasks</Text>
+          <Text style={[styles.planEmptyDesc, { color: colors.textTertiary }]}>
+            Long-press any future day to plan a one-time task
+          </Text>
+        </View>
+      )}
+
+      <View style={{ height: spacing.xxl }} />
+    </ScrollView>
+  );
+
+  // ─── Get header title/subtitle based on tab ───
+  const getHeaderInfo = () => {
+    if (activeTab === 'tasks') {
+      return {
+        title: 'Tasks',
+        subtitle: nonNegotiables.length > 0
+          ? `${doneNonNeg} of ${nonNegotiables.length} non-neg done`
+          : 'Build your daily routine',
+      };
+    }
+    if (activeTab === 'plan') {
+      return {
+        title: 'Plan',
+        subtitle: futureTasks.length > 0
+          ? `${futureTasks.length} task${futureTasks.length !== 1 ? 's' : ''} scheduled`
+          : 'Plan your upcoming tasks',
+      };
+    }
+    return {
+      title: 'Reminders',
+      subtitle: reminders.length > 0 ? `${activeReminders} active` : 'Stay on track',
+    };
+  };
+
+  const headerInfo = getHeaderInfo();
+
+  // ─── Get add button action ───
+  const handleAdd = () => {
+    if (activeTab === 'tasks') router.push('/create-task');
+    else if (activeTab === 'plan') {
+      // Pre-fill with tomorrow if no day selected
+      const targetDate = selectedPlanDay || (() => {
+        const d = new Date();
+        d.setDate(d.getDate() + 1);
+        return d.toISOString().split('T')[0];
+      })();
+      router.push({ pathname: '/create-task', params: { prefillDate: targetDate, prefillType: 'one_time' } } as any);
+    }
+    else router.push('/create-reminder');
+  };
+
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.title, { color: colors.textPrimary }]}>
-            {activeTab === 'tasks' ? 'Tasks' : 'Reminders'}
-          </Text>
-          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-            {activeTab === 'tasks'
-              ? (nonNegotiables.length > 0
-                  ? `${doneNonNeg} of ${nonNegotiables.length} non-neg done`
-                  : 'Build your daily routine')
-              : (reminders.length > 0 ? `${activeReminders} active` : 'Stay on track')
-            }
-          </Text>
+          <Text style={[styles.title, { color: colors.textPrimary }]}>{headerInfo.title}</Text>
+          <Text style={[styles.subtitle, { color: colors.textSecondary }]}>{headerInfo.subtitle}</Text>
         </View>
         <TouchableOpacity
           testID="add-item-btn"
           style={[styles.addBtn, { backgroundColor: colors.accent }]}
-          onPress={() => router.push(activeTab === 'tasks' ? '/create-task' : '/create-reminder')}
+          onPress={handleAdd}
           activeOpacity={0.8}
         >
           <Ionicons name="add" size={22} color="#fff" />
         </TouchableOpacity>
       </View>
 
-      {/* Tabs */}
+      {/* Tabs: Tasks | Plan | Reminders */}
       <View style={[styles.tabContainer, { backgroundColor: colors.surfaceHighlight }]}>
-        <Animated.View
-          style={[
-            styles.tabIndicator,
-            { backgroundColor: colors.surface },
-            {
-              transform: [{
-                translateX: tabIndicatorAnim.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [4, 4 + (styles.tabContainer as any).width / 2 || 170]
-                })
-              }]
-            }
-          ]}
-        />
-        <TouchableOpacity
-          testID="tasks-tab-btn"
-          style={styles.tab}
-          onPress={() => switchTab('tasks')}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={activeTab === 'tasks' ? 'checkbox' : 'checkbox-outline'}
-            size={16}
-            color={activeTab === 'tasks' ? colors.accent : colors.textTertiary}
-          />
-          <Text style={[styles.tabText, { color: activeTab === 'tasks' ? colors.textPrimary : colors.textTertiary }]}>
-            Tasks
-          </Text>
-          {totalTasks > 0 && (
-            <View style={[styles.tabBadge, { backgroundColor: activeTab === 'tasks' ? colors.accent : colors.textTertiary }]}>
-              <Text style={styles.tabBadgeText}>{totalTasks}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
-        <TouchableOpacity
-          testID="reminders-tab-btn"
-          style={styles.tab}
-          onPress={() => switchTab('reminders')}
-          activeOpacity={0.7}
-        >
-          <Ionicons
-            name={activeTab === 'reminders' ? 'notifications' : 'notifications-outline'}
-            size={16}
-            color={activeTab === 'reminders' ? colors.accent : colors.textTertiary}
-          />
-          <Text style={[styles.tabText, { color: activeTab === 'reminders' ? colors.textPrimary : colors.textTertiary }]}>
-            Reminders
-          </Text>
-          {reminders.length > 0 && (
-            <View style={[styles.tabBadge, { backgroundColor: activeTab === 'reminders' ? colors.accent : colors.textTertiary }]}>
-              <Text style={styles.tabBadgeText}>{reminders.length}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {(['tasks', 'plan', 'reminders'] as TabKey[]).map((tab) => {
+          const isActive = activeTab === tab;
+          const icon = tab === 'tasks' ? (isActive ? 'checkbox' : 'checkbox-outline')
+            : tab === 'plan' ? (isActive ? 'calendar' : 'calendar-outline')
+            : (isActive ? 'notifications' : 'notifications-outline');
+          const label = tab === 'tasks' ? 'Tasks' : tab === 'plan' ? 'Plan' : 'Reminders';
+          const badge = tab === 'tasks' ? totalTasks : tab === 'plan' ? futureTasks.length : reminders.length;
+
+          return (
+            <TouchableOpacity
+              key={tab}
+              testID={`${tab}-tab-btn`}
+              style={[
+                styles.tab,
+                isActive && { backgroundColor: colors.surface, borderRadius: radius.sm },
+              ]}
+              onPress={() => switchTab(tab)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={icon as any} size={15} color={isActive ? colors.accent : colors.textTertiary} />
+              <Text style={[styles.tabText, { color: isActive ? colors.textPrimary : colors.textTertiary }]}>
+                {label}
+              </Text>
+              {badge > 0 && (
+                <View style={[styles.tabBadge, { backgroundColor: isActive ? colors.accent : colors.textTertiary }]}>
+                  <Text style={styles.tabBadgeText}>{badge}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {/* Content */}
@@ -513,7 +731,7 @@ export default function TasksScreen() {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* ── NON-NEGOTIABLES section ── */}
+            {/* NON-NEGOTIABLES section */}
             <View style={styles.sectionHeader}>
               <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>NON-NEGOTIABLES</Text>
               {nonNegotiables.length > 0 && (
@@ -538,7 +756,7 @@ export default function TasksScreen() {
               nonNegotiables.map(item => renderRoutine(item))
             )}
 
-            {/* ── NEGOTIABLES section ── */}
+            {/* NEGOTIABLES section */}
             <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
               <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>NEGOTIABLES</Text>
               {negotiables.length > 0 && (
@@ -555,7 +773,7 @@ export default function TasksScreen() {
               negotiables.map(item => renderRoutine(item))
             )}
 
-            {/* ── TO-DO section ── */}
+            {/* TO-DO section */}
             <View style={[styles.sectionHeader, { marginTop: spacing.xl }]}>
               <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>TO-DO</Text>
               {oneTimes.length > 0 && (
@@ -575,6 +793,8 @@ export default function TasksScreen() {
             <View style={{ height: spacing.xxl }} />
           </ScrollView>
         )
+      ) : activeTab === 'plan' ? (
+        renderPlanner()
       ) : (
         reminders.length === 0 ? renderEmptyReminders() : (
           <FlatList
@@ -630,46 +850,34 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     padding: 4,
     marginBottom: spacing.md,
-    position: 'relative' as const,
-  },
-  tabIndicator: {
-    position: 'absolute' as const,
-    top: 4,
-    left: 0,
-    width: '48%',
-    height: 40,
-    borderRadius: radius.sm,
   },
   tab: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm + 2,
-    gap: spacing.xs,
-    zIndex: 1,
+    paddingVertical: spacing.sm,
+    gap: 4,
   },
   tabText: {
     fontFamily: 'Inter_500Medium',
-    fontSize: fontSize.sm,
+    fontSize: 12,
   },
   tabBadge: {
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 5,
+    paddingHorizontal: 4,
   },
   tabBadgeText: {
     color: '#fff',
     fontFamily: 'Inter_500Medium',
-    fontSize: 10,
+    fontSize: 9,
   },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  listHeader: {
-    marginBottom: spacing.md,
-  },
+  listHeader: { marginBottom: spacing.md },
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -780,25 +988,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  taskContent: {
-    flex: 1,
-  },
+  taskContent: { flex: 1 },
   taskText: {
     fontFamily: 'Inter_400Regular',
     fontSize: fontSize.base,
     lineHeight: 22,
   },
-  taskDone: {
-    textDecorationLine: 'line-through',
-  },
+  taskDone: { textDecorationLine: 'line-through' },
   taskDoneLabel: {
     fontFamily: 'Inter_500Medium',
     fontSize: fontSize.xs,
     marginTop: 2,
   },
-  checkboxSquare: {
-    borderRadius: 5,
-  },
+  checkboxSquare: { borderRadius: 5 },
   oneTimeMeta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -822,9 +1024,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     overflow: 'hidden',
   },
-  reminderInactive: {
-    opacity: 0.6,
-  },
+  reminderInactive: { opacity: 0.6 },
   reminderHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -838,9 +1038,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  reminderBody: {
-    flex: 1,
-  },
+  reminderBody: { flex: 1 },
   reminderTitle: {
     fontFamily: 'Inter_500Medium',
     fontSize: fontSize.base,
@@ -850,9 +1048,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     marginTop: 2,
   },
-  reminderSwitch: {
-    transform: [{ scale: 0.85 }],
-  },
+  reminderSwitch: { transform: [{ scale: 0.85 }] },
   reminderFooter: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -870,7 +1066,144 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: fontSize.xs,
   },
-  reminderActionBtn: {
-    padding: spacing.xs,
+  reminderActionBtn: { padding: spacing.xs },
+
+  // ─── Planner styles ───
+  plannerScroll: { paddingHorizontal: spacing.lg },
+  planMonthNav: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  planMonthCenter: { alignItems: 'center' },
+  planMonthName: {
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: 20,
+    letterSpacing: 1,
+  },
+  planMonthSub: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    marginTop: 2,
+  },
+  planDowRow: { flexDirection: 'row', marginBottom: 4 },
+  planDowLabel: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 11,
+    textAlign: 'center',
+  },
+  planWeek: { flexDirection: 'row' },
+  planCell: {
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  planDayCircle: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planDayNum: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 14,
+  },
+  planBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 14,
+    height: 14,
+    borderRadius: 7,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  planBadgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 9,
+  },
+  planLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingTop: spacing.md,
+    marginTop: spacing.xs,
+    borderTopWidth: 0.5,
+    marginBottom: spacing.lg,
+  },
+  planLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  planLegendCircle: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+  },
+  planLegendLabel: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+  },
+  planLegendTip: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 11,
+    fontStyle: 'italic',
+  },
+  planDetail: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  planDetailHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  planDetailDate: {
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.xs,
+    letterSpacing: 1,
+  },
+  planDetailAddBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  planDetailEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  planDetailEmptyText: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.sm,
+  },
+  planDetailTasks: { gap: spacing.sm },
+  planEmptyCard: {
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    padding: spacing.xl,
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  planEmptyTitle: {
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.lg,
+    letterSpacing: 0.5,
+    marginTop: spacing.sm,
+  },
+  planEmptyDesc: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.sm,
+    textAlign: 'center',
   },
 });
