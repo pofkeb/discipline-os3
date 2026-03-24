@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../src/constants/theme';
 import { useSubscription, getLimits } from '../src/contexts/SubscriptionContext';
@@ -53,6 +53,8 @@ function formatNextDue(type: RepeatType, value: number, specificTime?: string): 
 export default function CreateReminderScreen() {
   const colors = useThemeColors();
   const router = useRouter();
+  const { id: editId } = useLocalSearchParams<{ id?: string }>();
+  const isEditing = !!editId;
   const { plan } = useSubscription();
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
@@ -61,6 +63,29 @@ export default function CreateReminderScreen() {
   const [hour, setHour] = useState('09');
   const [minute, setMinute] = useState('00');
   const [loading, setLoading] = useState(false);
+  const [initializing, setInitializing] = useState(isEditing);
+
+  // When editing, pre-fill all fields with the existing reminder data
+  useEffect(() => {
+    if (!isEditing) return;
+    api.getReminders().then((reminders: any[]) => {
+      const rem = reminders.find((r: any) => r.id === editId);
+      if (!rem) {
+        Alert.alert('Error', 'Reminder not found');
+        router.back();
+        return;
+      }
+      setTitle(rem.title);
+      setNote(rem.note ?? '');
+      setRepeatType(rem.interval_type as RepeatType);
+      setIntervalValue(String(rem.interval_value));
+      if (rem.interval_type === 'specific' && rem.specific_time) {
+        const [h, m] = rem.specific_time.split(':');
+        setHour(h);
+        setMinute(m);
+      }
+    }).finally(() => setInitializing(false));
+  }, [editId]);
 
   const specificTime = `${hour.padStart(2, '0')}:${minute.padStart(2, '0')}`;
   const preview = formatNextDue(repeatType, parseInt(intervalValue) || 1, specificTime);
@@ -70,12 +95,16 @@ export default function CreateReminderScreen() {
       Alert.alert('Error', 'Please enter a reminder title');
       return;
     }
-    const reminders = await api.getReminders();
-    const limits = getLimits(plan);
-    if (reminders.length >= limits.maxReminders) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-      router.push('/paywall');
-      return;
+
+    // Only check the count limit when creating, not when editing
+    if (!isEditing) {
+      const reminders = await api.getReminders();
+      const limits = getLimits(plan);
+      if (reminders.length >= limits.maxReminders) {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+        router.push('/paywall');
+        return;
+      }
     }
     
     // Request notification permission if not already granted
@@ -83,10 +112,12 @@ export default function CreateReminderScreen() {
     if (permStatus !== 'granted') {
       const granted = await requestNotificationPermission();
       if (!granted) {
-        // Still create the reminder, but warn user
+        // Still create/update the reminder, but warn user
         Alert.alert(
           'Notifications Disabled',
-          'Your reminder was saved but notifications are disabled. Enable them in Settings to receive alerts.',
+          isEditing
+            ? 'Your reminder was updated but notifications are disabled. Enable them in Settings to receive alerts.'
+            : 'Your reminder was saved but notifications are disabled. Enable them in Settings to receive alerts.',
           [{ text: 'OK' }]
         );
       }
@@ -95,11 +126,15 @@ export default function CreateReminderScreen() {
     setLoading(true);
     try {
       const time = repeatType === 'specific' ? specificTime : undefined;
-      await api.createReminder(title.trim(), repeatType, parseInt(intervalValue) || 1, time, note.trim());
+      if (isEditing) {
+        await api.updateReminder(editId!, title.trim(), repeatType, parseInt(intervalValue) || 1, time, note.trim());
+      } else {
+        await api.createReminder(title.trim(), repeatType, parseInt(intervalValue) || 1, time, note.trim());
+      }
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'Failed to create reminder');
+      Alert.alert('Error', e.message || (isEditing ? 'Failed to update reminder' : 'Failed to create reminder'));
     } finally {
       setLoading(false);
     }
@@ -118,11 +153,18 @@ export default function CreateReminderScreen() {
           <TouchableOpacity testID="close-create-reminder-btn" onPress={() => router.back()}>
             <Ionicons name="close" size={28} color={colors.textPrimary} />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>NEW REMINDER</Text>
+          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            {isEditing ? 'EDIT REMINDER' : 'NEW REMINDER'}
+          </Text>
           <View style={{ width: 28 }} />
         </View>
 
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        {initializing ? (
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={colors.accent} />
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           {/* Title */}
           <Text style={[styles.label, { color: colors.textSecondary }]}>TITLE</Text>
           <TextInput
@@ -256,7 +298,7 @@ export default function CreateReminderScreen() {
             </View>
           )}
 
-          {/* Create Button */}
+          {/* Create / Update Button */}
           <TouchableOpacity
             testID="save-reminder-btn"
             style={[styles.button, { backgroundColor: colors.accent }]}
@@ -264,11 +306,18 @@ export default function CreateReminderScreen() {
             disabled={loading}
             activeOpacity={0.8}
           >
-            {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.buttonText}>ADD REMINDER</Text>}
+            {loading ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {isEditing ? 'UPDATE REMINDER' : 'ADD REMINDER'}
+              </Text>
+            )}
           </TouchableOpacity>
 
           <View style={{ height: spacing.xxl }} />
         </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -277,6 +326,7 @@ export default function CreateReminderScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
   headerTitle: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xl, letterSpacing: 1 },
   scrollContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },

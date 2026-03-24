@@ -147,6 +147,15 @@ class ApiService {
     return res;
   }
 
+  async updateReminder(id: string, title: string, interval_type: string, interval_value: number, specific_time?: string, note?: string) {
+    const rem = await localStore.updateReminder(id, title, interval_type, interval_value, specific_time, note);
+    this.mirrorToBackend(`/reminders/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ title, note: note ?? '', interval_type, interval_value, specific_time }),
+    });
+    return rem;
+  }
+
   // ─── Stats & Quotes (always local) ───
 
   getStats() { return localStore.getStats(); }

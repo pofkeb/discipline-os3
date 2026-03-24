@@ -213,8 +213,16 @@ export default function TasksScreen() {
             </Text>
           </View>
           <TouchableOpacity
+            testID={`reminder-edit-${item.id}`}
+            style={styles.reminderActionBtn}
+            onPress={() => router.push({ pathname: '/create-reminder', params: { id: item.id } } as any)}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Ionicons name="pencil-outline" size={14} color={colors.textTertiary} />
+          </TouchableOpacity>
+          <TouchableOpacity
             testID={`reminder-delete-${item.id}`}
-            style={styles.reminderDeleteBtn}
+            style={styles.reminderActionBtn}
             onPress={() => deleteReminder(item.id)}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
           >
@@ -644,8 +652,7 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: fontSize.xs,
   },
-  reminderDeleteBtn: {
-    marginLeft: 'auto',
+  reminderActionBtn: {
     padding: spacing.xs,
   },
 });

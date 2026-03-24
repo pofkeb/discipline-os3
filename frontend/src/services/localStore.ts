@@ -213,6 +213,43 @@ export async function toggleReminderActive(id: string) {
   return { is_active: r.is_active };
 }
 
+export async function updateReminder(
+  id: string,
+  title: string,
+  interval_type: string,
+  interval_value: number,
+  specific_time?: string,
+  note?: string
+) {
+  const reminders = await getReminders();
+  const idx = reminders.findIndex((r: any) => r.id === id);
+  if (idx === -1) throw new Error('Reminder not found');
+
+  const existing = reminders[idx];
+
+  // Cancel any currently scheduled notification for this reminder
+  // before writing new data, to avoid duplicates
+  await cancelReminderNotification(id);
+
+  reminders[idx] = {
+    ...existing,
+    title,
+    note: note ?? '',
+    interval_type,
+    interval_value,
+    specific_time: specific_time ?? null,
+  };
+
+  await setItem(KEYS.reminders, reminders);
+
+  // Only reschedule if the reminder is still active
+  if (reminders[idx].is_active) {
+    await scheduleReminderNotification(reminders[idx]);
+  }
+
+  return reminders[idx];
+}
+
 // ─── Stats ───
 
 export async function getStats() {
