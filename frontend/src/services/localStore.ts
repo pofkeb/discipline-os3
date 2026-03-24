@@ -407,12 +407,18 @@ export async function getStats() {
   // Today's completions: routine-only (drives the focus card)
   const todayC = (completions[todayStr()] || []).filter((cid: string) => routineIds.has(cid)).length;
 
-  let totalMilestones = 0;
-  let completedMilestones = 0;
+  // Goal roadmap stats: count all nodes (milestones + their steps).
+  // Old goals missing steps field are safe via m.steps ?? [].
+  let totalRoadmapNodes     = 0;
+  let completedRoadmapNodes = 0;
   goals.forEach((g: any) => {
     (g.milestones || []).forEach((m: any) => {
-      totalMilestones++;
-      if (m.is_completed) completedMilestones++;
+      totalRoadmapNodes++;
+      if (m.is_completed) completedRoadmapNodes++;
+      (m.steps ?? []).forEach((s: any) => {
+        totalRoadmapNodes++;
+        if (s.is_completed) completedRoadmapNodes++;
+      });
     });
   });
 
@@ -431,8 +437,8 @@ export async function getStats() {
     total_completions: totalCompletions,
     today_completions: todayC,
     total_goals: goals.length,
-    total_milestones: totalMilestones,
-    completed_milestones: completedMilestones,
+    total_milestones: totalRoadmapNodes,
+    completed_milestones: completedRoadmapNodes,
     weekly_data: weeklyData,
   };
 }

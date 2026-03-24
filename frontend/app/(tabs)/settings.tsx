@@ -327,7 +327,7 @@ export default function SettingsScreen() {
               <View testID="milestones-stat" style={[styles.statCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Ionicons name="flag" size={20} color={colors.success} />
                 <Text style={[styles.statNumber, { color: colors.textPrimary }]}>{stats.completed_milestones}</Text>
-                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Milestones</Text>
+                <Text style={[styles.statLabel, { color: colors.textTertiary }]}>Roadmap</Text>
               </View>
             </View>
           )}
