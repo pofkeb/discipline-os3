@@ -5,12 +5,26 @@
  * - Graceful fallback for web / Expo Go (where native SDK is not linked)
  * - Preserved existing interface (plan, isPro, purchasePackage, restorePurchases, isLoading)
  * - Extended with `offerings` and `rcAvailable` for paywall real-price display
+ * - RC account linking: calls Purchases.logIn(user.id) on login/register and
+ *   Purchases.logOut() on logout so purchases are always tied to the correct identity
  *
  * Behavior by environment:
- *   Native EAS build  → real RevenueCat SDK (real billing)
+ *   Native EAS build  → real RevenueCat SDK (real billing + account linking)
  *   Expo Go           → RC configure throws → fallback to AsyncStorage mock
  *   Web               → no RC attempt       → fallback to AsyncStorage mock
  *   Placeholder keys  → RC skipped          → fallback to AsyncStorage mock
+ *
+ * Account linking flow:
+ *   Guest user purchases Pro:
+ *     → purchase recorded on RC anonymous ID
+ *   Guest user then creates account / logs in:
+ *     → Purchases.logIn(user.id) merges the anonymous purchase into their account
+ *     → isPro stays true, no entitlement loss
+ *   User logs out:
+ *     → Purchases.logOut() resets RC to a fresh anonymous ID
+ *   Returning logged-in user opens app:
+ *     → RC initialises (anonymous), then logIn(user.id) fires once auth loads
+ *     → correct entitlements restored from their account
  */
 
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo } from 'react';
@@ -23,6 +37,7 @@ import {
   RC_MONTHLY_PACKAGE_ID,
   RC_ANNUAL_PACKAGE_ID,
 } from '../config/revenuecat';
+import { useAuth } from './AuthContext';
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -67,13 +82,17 @@ function isRcEnvironmentSupported(): boolean {
 // ─── Provider ───────────────────────────────────────────────────────────────────
 
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
+  const { user, isGuest } = useAuth();
+
   const [rcConfigured,  setRcConfigured]  = useState(false);
   const [customerInfo,  setCustomerInfo]  = useState<RCCustomerInfo | null>(null);
   const [offerings,     setOfferings]     = useState<RCOfferings | null>(null);
   const [localPlan,     setLocalPlan]     = useState<Plan>('free');
   const [isLoading,     setIsLoading]     = useState(false);
 
-  const listenerRef = useRef<RCListener | null>(null);
+  const listenerRef    = useRef<RCListener | null>(null);
+  // Tracks the RC-identified user ID so we know when to call logIn / logOut
+  const prevUserIdRef  = useRef<string | null>(null);
 
   // ── Init ─────────────────────────────────────────────────────────────────────
 
@@ -82,6 +101,61 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     return cleanupListener;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── RC account linking ────────────────────────────────────────────────────────
+  // Fires whenever auth state or rcConfigured changes.
+  // Keeps RC's identity in sync with the app's auth state so purchases
+  // made as a guest are linked to the account after login/register, and
+  // are correctly loaded on every subsequent cold start.
+
+  useEffect(() => {
+    if (!rcConfigured) return;
+
+    if (!isGuest && user?.id) {
+      // User logged in or registered (and RC is ready)
+      if (prevUserIdRef.current !== user.id) {
+        prevUserIdRef.current = user.id;
+        syncRcLogin(user.id);
+      }
+    } else if (isGuest && prevUserIdRef.current !== null) {
+      // User explicitly logged out (was previously identified in RC)
+      prevUserIdRef.current = null;
+      syncRcLogout();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, isGuest, rcConfigured]);
+
+  /**
+   * Tell RC who the user is.
+   * logIn() merges any anonymous purchase history into the identified account,
+   * then returns the merged CustomerInfo. isPro updates accordingly.
+   */
+  async function syncRcLogin(userId: string) {
+    try {
+      const { default: Purchases } = await import('react-native-purchases');
+      const { customerInfo } = await Purchases.logIn(userId);
+      setCustomerInfo(customerInfo);
+      if (__DEV__) console.log('[RC] logIn complete for user:', userId);
+    } catch (err) {
+      // Silently ignored: web, Expo Go, placeholder keys, or network error.
+      if (__DEV__) console.warn('[RC] logIn failed (non-fatal):', err);
+    }
+  }
+
+  /**
+   * Reset RC to a fresh anonymous user.
+   * Called when the user signs out so their entitlements no longer show.
+   */
+  async function syncRcLogout() {
+    try {
+      const { default: Purchases } = await import('react-native-purchases');
+      const freshCustomerInfo = await Purchases.logOut();
+      setCustomerInfo(freshCustomerInfo);
+      if (__DEV__) console.log('[RC] logOut complete — reset to anonymous');
+    } catch (err) {
+      if (__DEV__) console.warn('[RC] logOut failed (non-fatal):', err);
+    }
+  }
 
   function cleanupListener() {
     if (listenerRef.current) {
