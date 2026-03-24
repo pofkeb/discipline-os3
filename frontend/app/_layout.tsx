@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts, BarlowCondensed_700Bold } from '@expo-google-fonts/barlow-condensed';
-import { Inter_400Regular, Inter_500Medium, Inter_700Bold } from '@expo-google-fonts/inter';
+import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import * as SplashScreen from 'expo-splash-screen';
 import { AuthProvider } from '../src/contexts/AuthContext';
 import { SubscriptionProvider } from '../src/contexts/SubscriptionContext';
@@ -14,6 +14,7 @@ export default function RootLayout() {
     BarlowCondensed_700Bold,
     Inter_400Regular,
     Inter_500Medium,
+    Inter_600SemiBold,
     Inter_700Bold,
   });
 

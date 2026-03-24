@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   tagline: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, marginTop: spacing.sm },
   form: { gap: spacing.md },
   input: { height: 56, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: fontSize.base, fontFamily: 'Inter_400Regular', borderWidth: 1 },
-  button: { height: 56, borderRadius: radius.lg, justifyContent: 'center', alignItems: 'center', shadowColor: '#FF3B30', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
+  button: { height: 56, borderRadius: radius.lg, justifyContent: 'center', alignItems: 'center', ...Platform.select({ ios: { shadowColor: '#FF3B30', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } }, android: { elevation: 4 } }) },
   buttonText: { color: '#FFFFFF', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.lg, letterSpacing: 1 },
   switchBtn: { alignItems: 'center', marginTop: spacing.xl },
   switchText: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm },

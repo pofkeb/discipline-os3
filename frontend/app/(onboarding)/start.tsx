@@ -20,21 +20,21 @@ export default function StartScreen() {
   const handleTemplate = async (template: typeof GOAL_TEMPLATES[0]) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await createGoalFromTemplate(template);
-    await completeOnboarding();
-    router.replace('/(tabs)');
+    // completeOnboarding() is handled by the notifications screen
+    router.push('/(onboarding)/notifications');
   };
 
   const handleDailyTemplate = async (template: typeof TASK_TEMPLATES[0]) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await createTasksFromTemplate(template);
-    await completeOnboarding();
-    router.replace('/(tabs)');
+    // completeOnboarding() is handled by the notifications screen
+    router.push('/(onboarding)/notifications');
   };
 
   const handleExplore = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    await completeOnboarding();
-    router.replace('/(tabs)');
+    // completeOnboarding() is handled by the notifications screen
+    router.push('/(onboarding)/notifications');
   };
 
   return (

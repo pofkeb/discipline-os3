@@ -4,7 +4,15 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../../src/constants/theme';
 import { completeOnboarding } from '../../src/services/localStore';
+import { requestNotificationPermission } from '../../src/services/notifications';
 import * as Haptics from 'expo-haptics';
+
+// Benefits that are accurately described — only what the app actually delivers
+const BENEFITS = [
+  { icon: 'alarm-outline',         text: 'Reminders that fire at your chosen schedule' },
+  { icon: 'time-outline',          text: 'Daily, hourly, or minute-based intervals' },
+  { icon: 'notifications-outline', text: 'Manage and pause reminders from the Tasks tab' },
+];
 
 export default function NotificationsScreen() {
   const colors = useThemeColors();
@@ -12,11 +20,14 @@ export default function NotificationsScreen() {
 
   const handleEnable = async () => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    // Request the actual system permission before completing onboarding
+    await requestNotificationPermission();
     await completeOnboarding();
     router.replace('/(tabs)');
   };
 
   const handleSkip = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     await completeOnboarding();
     router.replace('/(tabs)');
   };
@@ -24,7 +35,7 @@ export default function NotificationsScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
       <View style={styles.container}>
-        {/* Progress dots */}
+        {/* Progress dots — step 3 of 3, all filled */}
         <View style={styles.dots}>
           <View style={[styles.dot, { backgroundColor: colors.accent }]} />
           <View style={[styles.dot, { backgroundColor: colors.accent }]} />
@@ -38,15 +49,11 @@ export default function NotificationsScreen() {
 
           <Text style={[styles.title, { color: colors.textPrimary }]}>STAY ON TRACK</Text>
           <Text style={[styles.desc, { color: colors.textSecondary }]}>
-            Get reminders to complete your tasks, motivational quotes to keep you going, and milestone celebrations.
+            Get notified when your reminders trigger so you never miss what matters.
           </Text>
 
           <View style={styles.benefitList}>
-            {[
-              { icon: 'time-outline', text: 'Task reminders at the right time' },
-              { icon: 'flame-outline', text: 'Streak alerts to keep momentum' },
-              { icon: 'chatbubble-outline', text: 'Daily motivational quotes' },
-            ].map((b, i) => (
+            {BENEFITS.map((b, i) => (
               <View key={i} style={styles.benefitRow}>
                 <Ionicons name={b.icon as any} size={20} color={colors.accent} />
                 <Text style={[styles.benefitText, { color: colors.textPrimary }]}>{b.text}</Text>
@@ -80,15 +87,50 @@ const styles = StyleSheet.create({
   dots: { flexDirection: 'row', justifyContent: 'center', gap: 8, paddingTop: spacing.lg },
   dot: { width: 8, height: 8, borderRadius: 4 },
   content: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  iconWrap: { width: 96, height: 96, borderRadius: 48, justifyContent: 'center', alignItems: 'center', marginBottom: spacing.xl },
-  title: { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xxxl, letterSpacing: 1 },
-  desc: { fontFamily: 'Inter_400Regular', fontSize: fontSize.base, textAlign: 'center', marginTop: spacing.md, lineHeight: 24, paddingHorizontal: spacing.sm },
-  benefitList: { gap: spacing.md, marginTop: spacing.xl, alignSelf: 'stretch', paddingHorizontal: spacing.md },
+  iconWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.xl,
+  },
+  title: {
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.xxxl,
+    letterSpacing: 1,
+  },
+  desc: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: fontSize.base,
+    textAlign: 'center',
+    marginTop: spacing.md,
+    lineHeight: 24,
+    paddingHorizontal: spacing.sm,
+  },
+  benefitList: {
+    gap: spacing.md,
+    marginTop: spacing.xl,
+    alignSelf: 'stretch',
+    paddingHorizontal: spacing.md,
+  },
   benefitRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  benefitText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.base },
+  benefitText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.base, flex: 1 },
   bottom: { paddingBottom: spacing.xl, gap: spacing.md },
-  button: { height: 56, borderRadius: radius.lg, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: spacing.sm },
-  buttonText: { color: '#FFFFFF', fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.lg, letterSpacing: 1 },
+  button: {
+    height: 56,
+    borderRadius: radius.lg,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontFamily: 'BarlowCondensed_700Bold',
+    fontSize: fontSize.lg,
+    letterSpacing: 1,
+  },
   skipBtn: { alignItems: 'center', paddingVertical: spacing.sm },
   skipText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm },
 });
