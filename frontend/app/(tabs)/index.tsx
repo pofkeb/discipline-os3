@@ -44,8 +44,13 @@ export default function HomeScreen() {
   if (!ready) return <SafeAreaView style={[s.safe, { backgroundColor: c.background }]} />;
 
   const goal = goals[0];
-  // Routines: daily check-off progress; one-time incomplete: still show on home
-  const routines        = tasks.filter(t => (t.type ?? 'routine') === 'routine');
+  // Migration shim for task type — old 'routine' and missing type → non_negotiable
+  const isDailyType = (type: string | undefined) => {
+    const t = type ?? 'routine';
+    return t === 'routine' || t === 'non_negotiable' || t === 'negotiable';
+  };
+  // Routines: all daily types (non_negotiable + negotiable + legacy 'routine')
+  const routines        = tasks.filter(t => isDailyType(t.type));
   const incompleteOTs   = tasks.filter(t => (t.type ?? 'routine') === 'one_time' && !t.is_completed);
   const visibleTasks    = [...routines, ...incompleteOTs];
   const doneToday       = routines.filter(t => t.is_completed_today).length;

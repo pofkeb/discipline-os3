@@ -145,7 +145,13 @@ export default function TasksScreen() {
   };
 
   // ─── Derived list splits ───
-  const routines  = tasks.filter(t => (t.type ?? 'routine') === 'routine');
+  // Migration shim: old 'routine' and missing type both map to non_negotiable.
+  // All three daily types belong in the repeating-tasks section.
+  const isDailyType = (type: string | undefined) => {
+    const t = type ?? 'routine';
+    return t === 'routine' || t === 'non_negotiable' || t === 'negotiable';
+  };
+  const routines  = tasks.filter(t => isDailyType(t.type));
   const oneTimes  = tasks.filter(t => (t.type ?? 'routine') === 'one_time');
   const doneToday = routines.filter(t => t.is_completed_today).length;
   const totalTasks = tasks.length;

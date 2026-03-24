@@ -3,7 +3,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useThemeColors, spacing, radius, fontSize } from '../../src/constants/theme';
-import { completeOnboarding, createGoalFromTemplate, GOAL_TEMPLATES } from '../../src/services/localStore';
+import { completeOnboarding, createGoalFromTemplate, GOAL_TEMPLATES, createTasksFromTemplate, TASK_TEMPLATES } from '../../src/services/localStore';
 import * as Haptics from 'expo-haptics';
 
 export default function StartScreen() {
@@ -20,6 +20,13 @@ export default function StartScreen() {
   const handleTemplate = async (template: typeof GOAL_TEMPLATES[0]) => {
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     await createGoalFromTemplate(template);
+    await completeOnboarding();
+    router.replace('/(tabs)');
+  };
+
+  const handleDailyTemplate = async (template: typeof TASK_TEMPLATES[0]) => {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    await createTasksFromTemplate(template);
     await completeOnboarding();
     router.replace('/(tabs)');
   };
@@ -60,8 +67,8 @@ export default function StartScreen() {
           <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
         </TouchableOpacity>
 
-        {/* Templates */}
-        <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>OR START WITH A TEMPLATE</Text>
+        {/* Goal templates */}
+        <Text style={[styles.sectionLabel, { color: colors.textTertiary }]}>OR START WITH A GOAL TEMPLATE</Text>
 
         {GOAL_TEMPLATES.map((template, i) => (
           <TouchableOpacity
@@ -77,6 +84,30 @@ export default function StartScreen() {
             <View style={styles.templateContent}>
               <Text style={[styles.templateTitle, { color: colors.textPrimary }]}>{template.title}</Text>
               <Text style={[styles.templateDesc, { color: colors.textSecondary }]} numberOfLines={1}>{template.description}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+
+        {/* Daily routine templates */}
+        <Text style={[styles.sectionLabel, { color: colors.textTertiary, marginTop: spacing.lg }]}>SET UP DAILY ROUTINES</Text>
+
+        {TASK_TEMPLATES.map((template, i) => (
+          <TouchableOpacity
+            key={i}
+            testID={`onboarding-daily-template-${i}-btn`}
+            style={[styles.templateCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => handleDailyTemplate(template)}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.templateIcon, { backgroundColor: colors.accent + '12' }]}>
+              <Ionicons name={template.icon as any} size={22} color={colors.accent} />
+            </View>
+            <View style={styles.templateContent}>
+              <Text style={[styles.templateTitle, { color: colors.textPrimary }]}>{template.title}</Text>
+              <Text style={[styles.templateDesc, { color: colors.textSecondary }]} numberOfLines={1}>{template.description}</Text>
+            </View>
+            <View style={[styles.dailyBadge, { backgroundColor: colors.accent + '18' }]}>
+              <Text style={[styles.dailyBadgeText, { color: colors.accent }]}>Tasks</Text>
             </View>
           </TouchableOpacity>
         ))}
@@ -114,6 +145,8 @@ const styles = StyleSheet.create({
   templateContent: { flex: 1 },
   templateTitle: { fontFamily: 'Inter_500Medium', fontSize: fontSize.base },
   templateDesc: { fontFamily: 'Inter_400Regular', fontSize: fontSize.sm, marginTop: 1 },
+  dailyBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+  dailyBadgeText: { fontFamily: 'Inter_700Bold', fontSize: 10 },
   skipBtn: { alignItems: 'center', paddingVertical: spacing.xl },
   skipText: { fontFamily: 'Inter_500Medium', fontSize: fontSize.sm, textDecorationLine: 'underline' },
 });

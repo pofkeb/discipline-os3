@@ -107,7 +107,7 @@ class ApiService {
 
   getTasks() { return localStore.getTasks(); }
 
-  async createTask(title: string, type: 'routine' | 'one_time' = 'routine', due_date: string | null = null) {
+  async createTask(title: string, type: 'non_negotiable' | 'negotiable' | 'one_time' = 'non_negotiable', due_date: string | null = null) {
     const task = await localStore.createTask(title, type, due_date);
     this.mirrorToBackend('/tasks', { method: 'POST', body: JSON.stringify({ title, type, due_date }) });
     return task;

@@ -158,8 +158,8 @@ export async function getTasks(): Promise<any[]> {
   });
 }
 
-export async function createTask(title: string, type: 'routine' | 'one_time' = 'routine', due_date: string | null = null) {
-  const tasks = await getItem(KEYS.tasks, []);
+export async function createTask(title: string, type: 'non_negotiable' | 'negotiable' | 'one_time' = 'non_negotiable', due_date: string | null = null) {
+  const tasks = await getItem<any[]>(KEYS.tasks, []);
   const task = {
     id: generateId(),
     title,
@@ -180,7 +180,7 @@ export async function deleteTask(id: string) {
 
 export async function toggleTask(id: string) {
   // Look up task type first to determine toggle semantics
-  const tasks = await getItem(KEYS.tasks, []);
+  const tasks = await getItem<any[]>(KEYS.tasks, []);
   const task = tasks.find((t: any) => t.id === id);
   const type: 'routine' | 'one_time' = task?.type ?? 'routine';
 
@@ -328,23 +328,29 @@ export async function getStats() {
   const completions = await getItem<Record<string, string[]>>(KEYS.completions, {});
   const goals = await getItem(KEYS.goals, []);
 
-  // Only routine task IDs count toward streak and weekly chart.
-  // Old tasks with no 'type' field are treated as routines (migration shim).
-  const routineIds = new Set<string>(
+  // Streak counts: only non_negotiable tasks (includes old 'routine' tasks via migration shim).
+  // Negotiable tasks intentionally do NOT count toward streak.
+  const streakIds = new Set<string>(
     tasks
-      .filter((t: any) => (t.type ?? 'routine') === 'routine')
+      .filter((t: any) => {
+        const type = t.type ?? 'routine';
+        return type === 'routine' || type === 'non_negotiable';
+      })
       .map((t: any) => t.id as string)
   );
 
-  // Streak: consecutive days that have at least one routine completion
+  // Weekly chart counts non-negotiable completions only (same scope as streak)
+  const routineIds = streakIds;
+
+  // Streak: consecutive days that have at least one non-negotiable completion
   let streak = 0;
   const now = new Date();
   for (let i = 0; i < 365; i++) {
     const d = new Date(now);
     d.setDate(d.getDate() - i);
     const ds = d.toISOString().split('T')[0];
-    const hasRoutine = (completions[ds] || []).some((cid: string) => routineIds.has(cid));
-    if (hasRoutine) { streak++; } else { break; }
+    const hasNonNeg = (completions[ds] || []).some((cid: string) => streakIds.has(cid));
+    if (hasNonNeg) { streak++; } else { break; }
   }
 
   // Total completions: all task types (historical count)
@@ -442,13 +448,8 @@ export async function createGoalFromTemplate(template: { title: string; descript
   return goal;
 }
 
+// Goal templates: long-term outcomes with milestone roadmaps
 export const GOAL_TEMPLATES = [
-  {
-    icon: 'sunny-outline' as const,
-    title: 'Morning Routine',
-    description: 'Build a powerful morning that sets up your entire day',
-    milestones: ['Wake up early', 'Meditate 10 minutes', 'Exercise 30 minutes', 'Journal & plan the day', 'Healthy breakfast'],
-  },
   {
     icon: 'barbell-outline' as const,
     title: '30-Day Fitness',
@@ -462,3 +463,34 @@ export const GOAL_TEMPLATES = [
     milestones: ['Choose your skill', 'Find learning resources', 'Practice 30 min daily', 'Build a mini project', 'Share your progress'],
   },
 ];
+
+// Daily task templates: create non-negotiable or negotiable routine tasks — NOT goals
+export const TASK_TEMPLATES = [
+  {
+    icon: 'sunny-outline' as const,
+    title: 'Morning Routine',
+    description: 'Start every day with your non-negotiables',
+    tasks: [
+      'Wake up early',
+      'Meditate 10 minutes',
+      'Exercise 30 minutes',
+      'Journal & plan the day',
+      'Healthy breakfast',
+    ],
+    type: 'non_negotiable' as const,
+  },
+];
+
+export async function createTasksFromTemplate(template: typeof TASK_TEMPLATES[0]) {
+  const existing = await getItem<any[]>(KEYS.tasks, []);
+  const newTasks = template.tasks.map(title => ({
+    id: generateId(),
+    title,
+    type: template.type,
+    due_date: null,
+    created_at: new Date().toISOString(),
+  }));
+  // Prepend new tasks so they appear at the top of the list
+  await setItem(KEYS.tasks, [...newTasks, ...existing]);
+  return newTasks.map(t => ({ ...t, is_completed_today: false, is_completed: false, completed_date: null }));
+}

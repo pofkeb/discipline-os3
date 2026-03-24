@@ -8,11 +8,12 @@ import { useSubscription, getLimits } from '../src/contexts/SubscriptionContext'
 import { api } from '../src/services/api';
 import * as Haptics from 'expo-haptics';
 
-type TaskType = 'routine' | 'one_time';
+type TaskType = 'non_negotiable' | 'negotiable' | 'one_time';
 
 const TYPE_OPTIONS: { key: TaskType; label: string; icon: string; desc: string }[] = [
-  { key: 'routine',  label: 'Routine',   icon: 'repeat-outline',        desc: 'Resets every day' },
-  { key: 'one_time', label: 'One-Time',  icon: 'checkmark-circle-outline', desc: 'Complete once' },
+  { key: 'non_negotiable', label: 'Non-Negotiable', icon: 'shield-checkmark-outline', desc: 'Must do every day' },
+  { key: 'negotiable',     label: 'Negotiable',     icon: 'repeat-outline',           desc: 'Aim to do daily' },
+  { key: 'one_time',       label: 'One-Time',        icon: 'checkmark-circle-outline', desc: 'Complete once' },
 ];
 
 function todayParts(): { month: string; day: string; year: string } {
@@ -46,7 +47,7 @@ export default function CreateTaskScreen() {
   const router = useRouter();
   const { plan } = useSubscription();
   const [title, setTitle] = useState('');
-  const [taskType, setTaskType] = useState<TaskType>('routine');
+  const [taskType, setTaskType] = useState<TaskType>('non_negotiable');
   const [loading, setLoading] = useState(false);
 
   // Date state — pre-filled with today, only used when taskType === 'one_time'
@@ -128,7 +129,7 @@ export default function CreateTaskScreen() {
             returnKeyType="done"
           />
 
-          {/* Type selector */}
+          {/* Type selector — vertical rows */}
           <Text style={[styles.label, { color: colors.textSecondary }]}>TYPE</Text>
           <View style={styles.typeGrid}>
             {TYPE_OPTIONS.map(opt => {
@@ -145,25 +146,23 @@ export default function CreateTaskScreen() {
                   onPress={() => selectType(opt.key)}
                   activeOpacity={0.7}
                 >
-                  <Ionicons
-                    name={opt.icon as any}
-                    size={22}
-                    color={active ? colors.accent : colors.textSecondary}
-                  />
-                  <Text style={[styles.typeLabel, { color: active ? colors.accent : colors.textPrimary }]}>
-                    {opt.label}
-                  </Text>
-                  <Text style={[styles.typeDesc, { color: colors.textTertiary }]}>
-                    {opt.desc}
-                  </Text>
+                  <View style={[styles.typeIconWrap, { backgroundColor: active ? colors.accent + '18' : colors.surfaceHighlight }]}>
+                    <Ionicons name={opt.icon as any} size={20} color={active ? colors.accent : colors.textSecondary} />
+                  </View>
+                  <View style={styles.typeTextWrap}>
+                    <Text style={[styles.typeLabel, { color: active ? colors.accent : colors.textPrimary }]}>{opt.label}</Text>
+                    <Text style={[styles.typeDesc, { color: colors.textTertiary }]}>{opt.desc}</Text>
+                  </View>
+                  <View style={[styles.typeRadio, { borderColor: active ? colors.accent : colors.textTertiary }]}>
+                    {active && <View style={[styles.typeRadioInner, { backgroundColor: colors.accent }]} />}
+                  </View>
                 </TouchableOpacity>
               );
             })}
           </View>
 
           {/* Due date — only shown for one-time tasks */}
-          {taskType === 'one_time' && (
-            <>
+          {taskType === 'one_time' && (            <>
               <Text style={[styles.label, { color: colors.textSecondary }]}>DUE DATE</Text>
               <View style={styles.dateRow}>
                 <View style={styles.dateInputWrap}>
@@ -262,12 +261,16 @@ const styles = StyleSheet.create({
   label:       { fontFamily: 'BarlowCondensed_700Bold', fontSize: fontSize.xs, letterSpacing: 1, marginTop: spacing.lg, marginBottom: spacing.sm },
   input:       { height: 56, borderRadius: radius.md, paddingHorizontal: spacing.md, fontSize: fontSize.base, fontFamily: 'Inter_400Regular', borderWidth: 1 },
 
-  // Type selector
-  typeGrid:        { flexDirection: 'row', gap: spacing.sm },
-  typeCard:        { flex: 1, padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, alignItems: 'center', gap: spacing.xs },
+  // Type selector — vertical rows
+  typeGrid:        { gap: spacing.sm },
+  typeCard:        { flexDirection: 'row', alignItems: 'center', padding: spacing.md, borderRadius: radius.lg, borderWidth: 1, gap: spacing.md },
   typeCardActive:  { borderWidth: 2 },
+  typeIconWrap:    { width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' },
+  typeTextWrap:    { flex: 1 },
   typeLabel:       { fontFamily: 'Inter_700Bold', fontSize: fontSize.sm },
-  typeDesc:        { fontFamily: 'Inter_400Regular', fontSize: 10, textAlign: 'center' },
+  typeDesc:        { fontFamily: 'Inter_400Regular', fontSize: 10, marginTop: 2 },
+  typeRadio:       { width: 20, height: 20, borderRadius: 10, borderWidth: 2, justifyContent: 'center', alignItems: 'center' },
+  typeRadioInner:  { width: 10, height: 10, borderRadius: 5 },
 
   // Date inputs
   dateRow:       { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
